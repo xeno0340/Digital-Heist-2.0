@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Digital Heist 2.0</title>
+    <style>
+        :root {
+            --bg: #0b0e14;
+            --surface: #12161f;
+            --surface-2: #1a212c;
+            --border: #252e3c;
+            --text: #e9edf3;
+            --text-dim: #9aa4b4;
+            --text-faint: #66707f;
+            --accent: #e8b04b;
+            --accent-dim: #8a6a2e;
+            --accent-2: #4fb0a5;
+            --accent-2-dim: #2c6a63;
+            --danger: #d9694f;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .card {
+            max-width: 380px;
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 28px;
+        }
+
+        h1 {
+            font-family: monospace;
+            font-size: 1.3rem;
+            margin: 0 0 4px;
+            letter-spacing: .02em;
+        }
+
+        .sub {
+            color: var(--text-dim);
+            font-size: .88rem;
+            margin: 0 0 24px;
+        }
+
+        label {
+            display: block;
+            font-size: .82rem;
+            color: var(--text-dim);
+            margin: 14px 0 6px;
+        }
+
+        input {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            padding: 10px 12px;
+            font-size: .95rem;
+        }
+
+        input:focus {
+            outline: 2px solid var(--accent-dim);
+            outline-offset: 1px;
+        }
+
+        button.submit {
+            width: 100%;
+            margin-top: 20px;
+            font-family: monospace;
+            padding: 11px;
+            border-radius: 7px;
+            border: 1px solid var(--accent-dim);
+            background: var(--accent);
+            color: #1a1406;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: .92rem;
+        }
+
+        button.submit:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        .msg {
+            margin-top: 14px;
+            font-size: .85rem;
+            padding: 10px 12px;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .msg.error {
+            background: rgba(217, 105, 79, .12);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            display: block;
+        }
+
+        .msg.ok {
+            background: rgba(79, 176, 165, .12);
+            border: 1px solid var(--accent-2);
+            color: var(--accent-2);
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>DIGITAL HEIST 2.0</h1>
+        <p class="sub">Enter the team name and PIN you were given at check-in.</p>
+        <form id="form">
+            <label for="teamName">Team name</label>
+            <input id="teamName" type="text" autocomplete="off" required />
+            <label for="pin">PIN (4-6 digits)</label>
+            <input id="pin" type="password" inputmode="numeric" pattern="\d{4,6}" autocomplete="off" required />
+            <button type="submit" class="submit" id="submitBtn">Log In</button>
+            <div class="msg" id="msg"></div>
+        </form>
+    </div>
+
+    <script>
+        const API_BASE = ""; // same origin — change if this page is hosted separately from the backend
+
+        const submitBtn = document.getElementById("submitBtn");
+        const form = document.getElementById("form");
+        const msgEl = document.getElementById("msg");
+
+        // Already logged in? Skip straight to the map.
+        const existingTeamId = localStorage.getItem("dh_team_id");
+        if (existingTeamId) {
+            window.location.href = "map.html";
+        }
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const teamName = document.getElementById("teamName").value.trim();
+            const pin = document.getElementById("pin").value.trim();
+            msgEl.className = "msg";
+            submitBtn.disabled = true;
+
+            try {
+                const res = await fetch(API_BASE + "/api/team/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ teamName, pin }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Something went wrong.");
+
+                localStorage.setItem("dh_team_id", data.teamId);
+                localStorage.setItem("dh_team_name", data.teamName);
+                window.location.href = "map.html";
+            } catch (err) {
+                msgEl.textContent = err.message;
+                msgEl.className = "msg error";
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Digital Heist 2.0 — Map</title>
+    <style>
+        :root {
+            --bg: #0b0e14;
+            --surface: #12161f;
+            --surface-2: #1a212c;
+            --border: #252e3c;
+            --text: #e9edf3;
+            --text-dim: #9aa4b4;
+            --text-faint: #66707f;
+            --accent: #e8b04b;
+            --accent-dim: #8a6a2e;
+            --accent-2: #4fb0a5;
+            --accent-2-dim: #2c6a63;
+            --danger: #d9694f;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .topbar h1 {
+            font-family: monospace;
+            font-size: 1.05rem;
+            margin: 0;
+            letter-spacing: .02em;
+        }
+
+        .topbar .right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-family: monospace;
+            font-size: .85rem;
+        }
+
+        .intel {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .logout {
+            color: var(--text-faint);
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .wrap {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .progress-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+        }
+
+        .progress-bar .label {
+            font-family: monospace;
+            font-size: .82rem;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .progress-track {
+            height: 8px;
+            background: var(--surface-2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-2);
+            border-radius: 4px;
+            transition: width .3s ease;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 14px;
+        }
+
+        .node {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            cursor: pointer;
+            transition: border-color .15s;
+        }
+
+        .node:hover {
+            border-color: var(--accent-dim);
+        }
+
+        .node.done {
+            border-color: var(--accent-2-dim);
+            background: linear-gradient(180deg, rgba(79, 176, 165, .08), transparent);
+        }
+
+        .node .num {
+            font-family: monospace;
+            font-size: 11px;
+            color: var(--text-faint);
+            letter-spacing: .06em;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .node .num .runner {
+            color: var(--danger);
+        }
+
+        .node h3 {
+            margin: 8px 0 4px;
+            font-size: 1rem;
+        }
+
+        .node .flavor {
+            font-size: .82rem;
+            color: var(--text-dim);
+            margin: 0;
+        }
+
+        .node .shard {
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: .8rem;
+            color: var(--accent-2);
+        }
+
+        .node .check {
+            color: var(--accent-2);
+        }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 10;
+        }
+
+        .overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            max-width: 420px;
+            width: 100%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .modal h2 {
+            font-family: monospace;
+            font-size: 1.1rem;
+            margin: 0 0 6px;
+        }
+
+        .modal .flavor {
+            color: var(--text-dim);
+            font-size: .88rem;
+            margin: 0 0 18px;
+        }
+
+        .modal label {
+            display: block;
+            font-size: .82rem;
+            color: var(--text-dim);
+            margin-bottom: 6px;
+        }
+
+        .modal input {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            padding: 10px 12px;
+            font-size: .95rem;
+        }
+
+        .modal .actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .modal button {
+            font-family: monospace;
+            padding: 10px 14px;
+            border-radius: 7px;
+            border: 1px solid var(--border);
+            background: var(--surface-2);
+            color: var(--text);
+            cursor: pointer;
+            font-size: .88rem;
+        }
+
+        .modal button.submit {
+            background: var(--accent);
+            color: #1a1406;
+            border-color: var(--accent-dim);
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .modal .feedback {
+            margin-top: 12px;
+            font-size: .85rem;
+            padding: 9px 11px;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .modal .feedback.err {
+            background: rgba(217, 105, 79, .12);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            display: block;
+        }
+
+        .modal .feedback.ok {
+            background: rgba(79, 176, 165, .12);
+            border: 1px solid var(--accent-2);
+            color: var(--accent-2);
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="topbar">
+        <h1 id="teamLabel">DIGITAL HEIST 2.0</h1>
+        <div class="right">
+            <span>Intel: <span class="intel" id="intelDisplay">0</span></span>
+            <span class="logout" id="logoutBtn">Log out</span>
+        </div>
+    </div>
+
+    <div class="wrap">
+        <div class="progress-bar">
+            <div class="label">
+                <span>Nodes cleared</span>
+                <span id="progressLabel">0 / 6 needed for the vault</span>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill" id="progressFill" style="width:0%"></div>
+            </div>
+        </div>
+
+        <div class="grid" id="grid"></div>
+    </div>
+
+    <div class="overlay" id="overlay">
+        <div class="modal">
+            <h2 id="modalTitle"></h2>
+            <p class="flavor" id="modalFlavor"></p>
+            <label for="answerInput">Your answer</label>
+            <input id="answerInput" type="text" autocomplete="off" />
+            <div class="actions">
+                <button id="cancelBtn" type="button">Cancel</button>
+                <button id="submitAnswerBtn" class="submit" type="button">Submit</button>
+            </div>
+            <div class="feedback" id="feedback"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "";
+        const teamId = localStorage.getItem("dh_team_id");
+        const teamName = localStorage.getItem("dh_team_name");
+
+        if (!teamId) {
+            window.location.href = "login.html";
+        }
+        document.getElementById("teamLabel").textContent = teamName ? teamName.toUpperCase() : "DIGITAL HEIST 2.0";
+
+        // Node flavor text only — never the answers. The real answer key lives
+        // exclusively in server.js and is checked server-side.
+        const NODES = [
+            { id: 1, title: "Keypad Whisper", runner: false, flavor: "Decode the numbers. A=1…Z=26." },
+            { id: 2, title: "The Broker's Ledger", runner: false, flavor: "Crack the 3-digit constraint lock." },
+            { id: 3, title: "Paper Trail", runner: false, flavor: "Rebuild the record from three facts." },
+            { id: 4, title: "The Landmark", runner: false, flavor: "Answer the riddle." },
+            { id: 5, title: "Drop Point", runner: true, flavor: "Walk to your proctor desk and solve the riddle there." },
+            { id: 6, title: "Signal in the Noise", runner: false, flavor: "Decode the audio clip." },
+            { id: 7, title: "The Ask", runner: true, flavor: "Find the agent wearing gold. Say the phrase." },
+            { id: 8, title: "Anagram of the Mark", runner: false, flavor: "Unscramble the letters." },
+            { id: 9, title: "The Broker's Riddle", runner: false, flavor: "Solve the logic puzzle." },
+            { id: 10, title: "Last Mile", runner: true, flavor: "Crack the physical padlock at the front of the lab." },
+        ];
+
+        const NEEDED_FOR_VAULT = 6;
+        let completedNodes = new Set();
+        let activeNode = null;
+
+        const grid = document.getElementById("grid");
+        const overlay = document.getElementById("overlay");
+        const modalTitle = document.getElementById("modalTitle");
+        const modalFlavor = document.getElementById("modalFlavor");
+        const answerInput = document.getElementById("answerInput");
+        const feedback = document.getElementById("feedback");
+        const intelDisplay = document.getElementById("intelDisplay");
+        const progressLabel = document.getElementById("progressLabel");
+        const progressFill = document.getElementById("progressFill");
+
+        function renderGrid() {
+            grid.innerHTML = "";
+            for (const node of NODES) {
+                const done = completedNodes.has(node.id);
+                const el = document.createElement("div");
+                el.className = "node" + (done ? " done" : "");
+                el.innerHTML = `
+        <div class="num">
+          <span>NODE ${String(node.id).padStart(2, "0")}</span>
+          ${node.runner ? '<span class="runner">RUNNER</span>' : ""}
+        </div>
+        <h3>${node.title} ${done ? '<span class="check">&#10003;</span>' : ""}</h3>
+        <p class="flavor">${node.flavor}</p>
+        ${done ? '<div class="shard">Cleared</div>' : ""}
+      `;
+                el.addEventListener("click", () => openModal(node));
+                grid.appendChild(el);
+            }
+        }
+
+        function updateProgressUI(intel) {
+            intelDisplay.textContent = intel;
+            const cleared = completedNodes.size;
+            progressLabel.textContent = `${cleared} / ${NEEDED_FOR_VAULT} needed for the vault`;
+            progressFill.style.width = Math.min(100, (cleared / NEEDED_FOR_VAULT) * 100) + "%";
+        }
+
+        function openModal(node) {
+            activeNode = node;
+            modalTitle.textContent = `Node ${node.id} — ${node.title}`;
+            modalFlavor.textContent = node.flavor;
+            answerInput.value = "";
+            feedback.className = "feedback";
+            overlay.classList.add("open");
+            answerInput.focus();
+        }
+
+        function closeModal() {
+            overlay.classList.remove("open");
+            activeNode = null;
+        }
+
+        document.getElementById("cancelBtn").addEventListener("click", closeModal);
+        overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+
+        async function submitAnswer() {
+            if (!activeNode) return;
+            const answer = answerInput.value.trim();
+            if (!answer) return;
+
+            const res = await fetch(API_BASE + "/api/node/submit", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ teamId, nodeId: activeNode.id, answer }),
+            });
+            const data = await res.json();
+
+            if (data.correct) {
+                completedNodes.add(activeNode.id);
+                renderGrid();
+                feedback.textContent = data.alreadyCompleted
+                    ? "Already cleared — shard code: " + data.shardCode
+                    : `Correct! Shard code ${data.shardCode}, +${data.intelAwarded} Intel.`;
+                feedback.className = "feedback ok";
+                if (!data.alreadyCompleted) updateProgressUI(data.totalIntel);
+                setTimeout(closeModal, 1400);
+            } else {
+                feedback.textContent = "Not quite — try again.";
+                feedback.className = "feedback err";
+            }
+        }
+
+        document.getElementById("submitAnswerBtn").addEventListener("click", submitAnswer);
+        answerInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitAnswer(); });
+
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+            localStorage.removeItem("dh_team_id");
+            localStorage.removeItem("dh_team_name");
+            window.location.href = "login.html";
+        });
+
+        async function loadProgress() {
+            try {
+                const res = await fetch(API_BASE + "/api/team/" + teamId + "/progress");
+                const data = await res.json();
+                completedNodes = new Set(data.nodesCleared || []);
+                renderGrid();
+                updateProgressUI(data.intel || 0);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        renderGrid();
+        loadProgress();
+    </script>
+</body>
+
+</html>
