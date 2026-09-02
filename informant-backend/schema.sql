@@ -15,8 +15,17 @@ create table if not exists teams (
   team_name    text not null unique,
   pin_hash     text not null,
   intel        integer not null default 0,
+  -- Which puzzle variant (0-based index) this team was randomly assigned
+  -- at creation time — see VARIANT_NODES in server.js. Keeps nearby teams
+  -- from working the exact same puzzle instance.
+  variant      integer not null default 0,
   created_at   timestamptz not null default now()
 );
+
+-- If you already ran an earlier version of this schema (teams table
+-- exists but has no variant column yet), run this instead of the create
+-- table above — safe to run even if the column already exists:
+-- alter table teams add column if not exists variant integer not null default 0;
 
 -- Which nodes each team has cleared. One row per (team, node) — the
 -- primary key doubles as the "already completed" guard so a resubmit of

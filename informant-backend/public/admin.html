@@ -232,6 +232,7 @@
                     <tr>
                         <th>Team</th>
                         <th>PIN</th>
+                        <th>Variant</th>
                     </tr>
                 </thead>
                 <tbody id="resultsBody"></tbody>
@@ -269,10 +270,10 @@
             for (const r of rows) {
                 const tr = document.createElement("tr");
                 if (r.ok) {
-                    tr.innerHTML = `<td>${r.teamName}</td><td class="pin">${r.pin}</td>`;
-                    lastCsvRows.push([r.teamName, r.pin]);
+                    tr.innerHTML = `<td>${r.teamName}</td><td class="pin">${r.pin}</td><td>${r.variant}</td>`;
+                    lastCsvRows.push([r.teamName, r.pin, r.variant]);
                 } else {
-                    tr.innerHTML = `<td>${r.teamName}</td><td class="err">${r.error || "Failed"}</td>`;
+                    tr.innerHTML = `<td>${r.teamName}</td><td class="err">${r.error || "Failed"}</td><td></td>`;
                 }
                 resultsBody.appendChild(tr);
             }
@@ -332,7 +333,7 @@
                 lastCsvRows = [];
                 for (const t of data.teams) {
                     const tr = document.createElement("tr");
-                    tr.innerHTML = `<td>${t.team_name}</td><td>Intel: ${t.intel}</td>`;
+                    tr.innerHTML = `<td>${t.team_name}</td><td>Intel: ${t.intel}</td><td>${t.variant}</td>`;
                     resultsBody.appendChild(tr);
                 }
                 resultsCard.style.display = data.teams.length ? "block" : "none";
@@ -346,7 +347,7 @@
 
         downloadBtn.addEventListener("click", () => {
             if (!lastCsvRows.length) return;
-            const csv = ["team_name,pin", ...lastCsvRows.map((r) => `"${r[0].replace(/"/g, '""')}",${r[1]}`)].join("\n");
+            const csv = ["team_name,pin,variant", ...lastCsvRows.map((r) => `"${r[0].replace(/"/g, '""')}",${r[1]},${r[2]}`)].join("\n");
             const blob = new Blob([csv], { type: "text/csv" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");

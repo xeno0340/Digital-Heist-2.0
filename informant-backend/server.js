@@ -224,21 +224,138 @@ async function callOpenAI(systemPrompt, history) {
 //     correct/incorrect verdict, never the answer itself.
 // ---------------------------------------------------------------------
 
-// PLACEHOLDER content — swap in your real Engineers Day puzzle answers,
-// shard codes, and intel values before the event. Keep the id numbering
-// in sync with the NODES array in game-frontend/map.html.
-const NODE_ANSWERS = [
-    { id: 1, answer: "PLACEHOLDER1", shardCode: "SHARD-01", intel: 10 },
-    { id: 2, answer: "PLACEHOLDER2", shardCode: "SHARD-02", intel: 10 },
-    { id: 3, answer: "PLACEHOLDER3", shardCode: "SHARD-03", intel: 10 },
-    { id: 4, answer: "PLACEHOLDER4", shardCode: "SHARD-04", intel: 10 },
-    { id: 5, answer: "PLACEHOLDER5", shardCode: "SHARD-05", intel: 15 }, // runner node
-    { id: 6, answer: "PLACEHOLDER6", shardCode: "SHARD-06", intel: 10 },
-    { id: 7, answer: "PLACEHOLDER7", shardCode: "SHARD-07", intel: 15 }, // runner node
-    { id: 8, answer: "PLACEHOLDER8", shardCode: "SHARD-08", intel: 10 },
-    { id: 9, answer: "PLACEHOLDER9", shardCode: "SHARD-09", intel: 10 },
-    { id: 10, answer: "PLACEHOLDER10", shardCode: "SHARD-10", intel: 15 }, // runner node
-];
+// Real answer key, pulled from the Ten Nodes design doc + Intel Economy
+// doc. Keep the id numbering in sync with the NODES array in map.html.
+// NOTE: these are the FIXED example instances from the design doc — the
+// doc calls for per-team randomization of the surface values (different
+// target word for N1, different digit-sum targets for N2, etc.) before
+// the real event, to stop teams sitting near each other from comparing
+// answers. Shipping the fixed instances below is fine for a dry run /
+// small event; revisit before a large one.
+const VARIANT_COUNT = 8;
+
+// Nodes with a different puzzle per variant. Shard codes and intel stay
+// fixed per node id across every variant — only the puzzle content and
+// its answer change — since the vault only checks which node numbers a
+// team cleared, never which specific instance they solved. 8 variants
+// spreads ~30-40 teams into groups of 4-5 per version, enough that teams
+// sitting near each other are unlikely to land on the same puzzle.
+const VARIANT_NODES = {
+    1: {
+        shardCode: "H1", intel: 10, variants: [
+            { answer: "HEIST", display: "Using A=1…Z=26, decode: 8 · 5 · 9 · 19 · 20" },
+            { answer: "AGENT", display: "Using A=1…Z=26, decode: 1 · 7 · 5 · 14 · 20" },
+            { answer: "VAULT", display: "Using A=1…Z=26, decode: 22 · 1 · 21 · 12 · 20" },
+            { answer: "CIPHER", display: "Using A=1…Z=26, decode: 3 · 9 · 16 · 8 · 5 · 18" },
+            { answer: "BROKER", display: "Using A=1…Z=26, decode: 2 · 18 · 15 · 11 · 5 · 18" },
+            { answer: "SHADOW", display: "Using A=1…Z=26, decode: 19 · 8 · 1 · 4 · 15 · 23" },
+            { answer: "SIGNAL", display: "Using A=1…Z=26, decode: 19 · 9 · 7 · 14 · 1 · 12" },
+            { answer: "TARGET", display: "Using A=1…Z=26, decode: 20 · 1 · 18 · 7 · 5 · 20" },
+        ]
+    },
+    2: {
+        shardCode: "L2", intel: 15, variants: [
+            { answer: "462", display: "Find the 3-digit code: even · digits sum to 12 · first digit = 2x last digit · no digit is zero · all three digits differ." },
+            { answer: "612", display: "Find the 3-digit code: even · digits sum to 9 · first digit = 3x last digit · no digit is zero · all three digits differ." },
+            { answer: "672", display: "Find the 3-digit code: even · digits sum to 15 · first digit = 3x last digit · no digit is zero · all three digits differ." },
+            { answer: "812", display: "Find the 3-digit code: even · digits sum to 11 · first digit = 4x last digit · no digit is zero · all three digits differ." },
+            { answer: "854", display: "Find the 3-digit code: even · digits sum to 17 · first digit = 2x last digit · no digit is zero · all three digits differ." },
+            { answer: "832", display: "Find the 3-digit code: even · digits sum to 13 · first digit = 4x last digit · no digit is zero · all three digits differ." },
+            { answer: "874", display: "Find the 3-digit code: even · digits sum to 19 · first digit = 2x last digit · no digit is zero · all three digits differ." },
+            { answer: "682", display: "Find the 3-digit code: even · digits sum to 16 · first digit = 3x last digit · no digit is zero · all three digits differ." },
+        ]
+    },
+    3: {
+        shardCode: "P3", intel: 15, variants: [
+            { answer: "JUP1207", display: "Format AAABBCC, no spaces: (A) largest planet - first 3 letters. (B) year the Titanic sank - last 2 digits. (C) number of continents - 2 digits." },
+            { answer: "MAR6907", display: "Format AAABBCC, no spaces: (A) the red planet - first 3 letters. (B) the year humans first walked on the Moon - last 2 digits. (C) number of continents - 2 digits." },
+            { answer: "SAT4507", display: "Format AAABBCC, no spaces: (A) the ringed planet - first 3 letters. (B) the year World War II ended - last 2 digits. (C) number of continents - 2 digits." },
+            { answer: "VEN4707", display: "Format AAABBCC, no spaces: (A) the second planet from the sun - first 3 letters. (B) the year India gained independence - last 2 digits. (C) number of continents - 2 digits." },
+            { answer: "NEP9107", display: "Format AAABBCC, no spaces: (A) the farthest planet from the sun - first 3 letters. (B) the year the Soviet Union dissolved - last 2 digits. (C) number of continents - 2 digits." },
+            { answer: "MER7607", display: "Format AAABBCC, no spaces: (A) the closest planet to the sun - first 3 letters. (B) the year the US Declaration of Independence was signed - last 2 digits. (C) number of continents - 2 digits." },
+            { answer: "URA8907", display: "Format AAABBCC, no spaces: (A) the planet that rotates on its side - first 3 letters. (B) the year the Berlin Wall fell - last 2 digits. (C) number of continents - 2 digits." },
+            { answer: "EAR9207", display: "Format AAABBCC, no spaces: (A) the planet we're standing on - first 3 letters. (B) the year Columbus reached the Americas - last 2 digits. (C) number of continents - 2 digits." },
+        ]
+    },
+    4: {
+        shardCode: "C4", intel: 10, variants: [
+            { answer: "CHARMINAR", display: "I stand on four minarets, built by a king who feared the plague. My name simply means 'four towers.' What am I? (one word, no spaces)" },
+            { answer: "TAJMAHAL", display: "I am a marble tomb built for a queen, raised out of grief by the king who loved her. What am I? (one word, no spaces)" },
+            { answer: "EIFFELTOWER", display: "I was built for a fair, nearly torn down after twenty years, and now no skyline is complete without my shadow. What am I? (one word, no spaces)" },
+            { answer: "GREATWALL", display: "I stretch further than any single wall should, built to keep armies out, and I'm barely visible from space. What am I? (one word, no spaces)" },
+            { answer: "COLOSSEUM", display: "I once held eighty thousand roaring voices watching combat for sport. My name may come from a giant statue that stood nearby. What am I? (one word, no spaces)" },
+            { answer: "STATUEOFLIBERTY", display: "I hold a torch and a tablet, a gift from one nation to another, and I've welcomed millions arriving by sea. What am I? (one word, no spaces)" },
+            { answer: "GATEWAYOFINDIA", display: "I was built to welcome a king arriving by sea, and later watched an empire's soldiers leave for the last time. What am I? (one word, no spaces)" },
+            { answer: "REDFORT", display: "I am built from sandstone the color of my name, and every year a flag is raised from my ramparts on independence morning. What am I? (one word, no spaces)" },
+        ]
+    },
+    6: {
+        shardCode: "S6", intel: 15, variants: [
+            { answer: "VAULT", display: "Play the clip below - it's a word in Morse code. Use the reference table under the player to decode it.", audio: "/audio/morse-0.wav" },
+            { answer: "AGENT", display: "Play the clip below - it's a word in Morse code. Use the reference table under the player to decode it.", audio: "/audio/morse-1.wav" },
+            { answer: "GHOST", display: "Play the clip below - it's a word in Morse code. Use the reference table under the player to decode it.", audio: "/audio/morse-2.wav" },
+            { answer: "TRACE", display: "Play the clip below - it's a word in Morse code. Use the reference table under the player to decode it.", audio: "/audio/morse-3.wav" },
+            { answer: "ECHO", display: "Play the clip below - it's a word in Morse code. Use the reference table under the player to decode it.", audio: "/audio/morse-4.wav" },
+            { answer: "PROBE", display: "Play the clip below - it's a word in Morse code. Use the reference table under the player to decode it.", audio: "/audio/morse-5.wav" },
+            { answer: "RAVEN", display: "Play the clip below - it's a word in Morse code. Use the reference table under the player to decode it.", audio: "/audio/morse-6.wav" },
+            { answer: "CODEX", display: "Play the clip below - it's a word in Morse code. Use the reference table under the player to decode it.", audio: "/audio/morse-7.wav" },
+        ]
+    },
+    8: {
+        shardCode: "M8", intel: 10, variants: [
+            { answer: "SECURITY", display: "Unscramble (guards keep it, thieves spend a lifetime trying to break it): URTYCISE" },
+            { answer: "FIREWALL", display: "Unscramble (digital or literal, both are built to stop something dangerous getting through): ELRFWLAI" },
+            { answer: "PASSCODE", display: "Unscramble (say the right thing and the door simply opens): SOSCADEP" },
+            { answer: "STRONGBOX", display: "Unscramble (where the good stuff actually lives): RTSONBGOX" },
+            { answer: "BLUEPRINT", display: "Unscramble (every heist starts with one of these): TNRUELIBP" },
+            { answer: "SHADOWING", display: "Unscramble (what a good tail does without being noticed): OAHNGISWD" },
+            { answer: "LOCKSMITH", display: "Unscramble (knows every tumbler by feel): CIOTHKMLS" },
+            { answer: "ENCRYPTED", display: "Unscramble (turned to nonsense until you have the right key): NERCEPTYD" },
+        ]
+    },
+    9: {
+        shardCode: "B9", intel: 20, variants: [
+            { answer: "2", display: "9 gold bars and a balance scale with two pans. One bar is fake and slightly lighter than the rest. Minimum number of weighings to guarantee finding it?" },
+            { answer: "3", display: "27 gold bars and a balance scale with two pans. One bar is fake and slightly lighter than the rest. Minimum number of weighings to guarantee finding it?" },
+            { answer: "4", display: "81 gold bars and a balance scale with two pans. One bar is fake and slightly lighter than the rest. Minimum number of weighings to guarantee finding it?" },
+            { answer: "2", display: "9 gold bars and a balance scale with two pans. One bar is fake and slightly lighter than the rest. Minimum number of weighings to guarantee finding it?" },
+            { answer: "3", display: "27 gold bars and a balance scale with two pans. One bar is fake and slightly lighter than the rest. Minimum number of weighings to guarantee finding it?" },
+            { answer: "4", display: "81 gold bars and a balance scale with two pans. One bar is fake and slightly lighter than the rest. Minimum number of weighings to guarantee finding it?" },
+            { answer: "2", display: "9 gold bars and a balance scale with two pans. One bar is fake and slightly lighter than the rest. Minimum number of weighings to guarantee finding it?" },
+            { answer: "3", display: "27 gold bars and a balance scale with two pans. One bar is fake and slightly lighter than the rest. Minimum number of weighings to guarantee finding it?" },
+        ]
+    },
+};
+
+// Physical / in-person nodes - one fixed instance for every team, per the
+// design doc (a shared proctor desk, volunteer, or padlock prop can't be
+// randomized per team the way a screen puzzle can).
+const FIXED_NODES = {
+    5: { answer: "KEYBOARD", shardCode: "D5", intel: 15, display: "Walk to your proctor desk. Answer aloud: \"I have keys but no locks, space but no room, and you can enter but never go outside. What am I?\"" },
+    7: { answer: "TRUST", shardCode: "A7", intel: 20, display: "Find the agent wearing gold. Say the phrase: \"The vault remembers.\"" },
+    10: { answer: "0628", shardCode: "V10", intel: 25, display: "Crack the physical padlock at the front of the lab: all four digits even, sum to 16, smallest digit first & largest last, second digit = 3x third digit, no digit repeats." },
+};
+
+// Look up the answer/shard/intel a specific team's node submission is
+// checked against, given that team's assigned variant index.
+function getNodeDef(nodeId, variant) {
+    if (FIXED_NODES[nodeId]) return FIXED_NODES[nodeId];
+    const def = VARIANT_NODES[nodeId];
+    if (!def) return null;
+    const i = ((variant % def.variants.length) + def.variants.length) % def.variants.length;
+    const v = def.variants[i];
+    return { answer: v.answer, shardCode: def.shardCode, intel: def.intel, display: v.display, audio: v.audio };
+}
+
+// Public puzzle text for every node, for a given variant - safe to send
+// to the browser since it never includes the answer.
+function getPuzzleDisplay(variant) {
+    const ids = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    return ids.map((id) => {
+        const def = getNodeDef(id, variant);
+        return { id, display: def.display, audio: def.audio || null };
+    });
+}
 
 function normalizeAnswer(s) {
     return String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -261,6 +378,27 @@ function randomPin(digits = 4) {
 // ---------------------------------------------------------------------
 // 5. Routes
 // ---------------------------------------------------------------------
+
+// GET /api/informant/:teamId — load existing history + leverage without
+// spending a question. Powers public/index.html's "resume where I left
+// off on reload" behavior: it calls this first, and only asks for the
+// opening line via POST if history comes back empty.
+app.get("/api/informant/:teamId", async (req, res) => {
+    const { teamId } = req.params;
+    if (!teamId) return res.status(400).json({ error: "teamId is required" });
+
+    try {
+        const session = await getSession(teamId);
+        res.json({
+            history: session.history,
+            leverage: session.leverage,
+            gameOver: session.leverage <= 0,
+        });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: "Couldn't load session." });
+    }
+});
 
 // POST /api/informant  { teamId, message }
 // message can be omitted on the very first call to just get the opening line.
@@ -375,7 +513,19 @@ app.post("/api/node/submit", async (req, res) => {
         return res.status(400).json({ error: "teamId, nodeId, and answer are required." });
     }
 
-    const nodeDef = NODE_ANSWERS.find((n) => n.id === numericNodeId);
+    // Need the team's assigned variant before we know which puzzle instance
+    // (and therefore which answer) to check against.
+    const { data: team0, error: team0Err } = await supabase
+        .from("teams")
+        .select("intel, variant")
+        .eq("id", teamId)
+        .maybeSingle();
+    if (team0Err || !team0) {
+        console.error("Team lookup failed:", team0Err?.message);
+        return res.status(404).json({ error: "No such team." });
+    }
+
+    const nodeDef = getNodeDef(numericNodeId, team0.variant || 0);
     if (!nodeDef) return res.status(404).json({ error: "No such node." });
 
     if (normalizeAnswer(answer) !== normalizeAnswer(nodeDef.answer)) {
@@ -397,19 +547,12 @@ app.post("/api/node/submit", async (req, res) => {
     }
 
     if (existing) {
-        const { data: team, error: teamErr } = await supabase
-            .from("teams")
-            .select("intel")
-            .eq("id", teamId)
-            .maybeSingle();
-        if (teamErr) console.error("Team intel lookup failed:", teamErr.message);
-
         return res.json({
             correct: true,
             alreadyCompleted: true,
             shardCode: nodeDef.shardCode,
             intelAwarded: 0,
-            totalIntel: team ? team.intel : undefined,
+            totalIntel: team0.intel,
         });
     }
 
@@ -483,6 +626,27 @@ app.get("/api/team/:teamId/progress", async (req, res) => {
     });
 });
 
+// GET /api/team/:teamId/nodes — the puzzle text for this team's assigned
+// variant, one entry per node. Never includes answers, so it's safe to
+// call on every map load. map.html uses this instead of hardcoding one
+// shared puzzle for every team.
+app.get("/api/team/:teamId/nodes", async (req, res) => {
+    const { teamId } = req.params;
+
+    const { data: team, error: teamErr } = await supabase
+        .from("teams")
+        .select("variant")
+        .eq("id", teamId)
+        .maybeSingle();
+    if (teamErr) {
+        console.error("Node text lookup failed:", teamErr.message);
+        return res.status(500).json({ error: "Couldn't load puzzles." });
+    }
+    if (!team) return res.status(404).json({ error: "No such team." });
+
+    res.json({ nodes: getPuzzleDisplay(team.variant || 0) });
+});
+
 // ---------------------------------------------------------------------
 // 5d. Admin — bulk-create team accounts, list teams.
 //     Every route here requires the x-admin-secret header to match
@@ -511,11 +675,15 @@ app.post("/api/admin/teams", requireAdmin, async (req, res) => {
 
         const pin = randomPin(digits);
         const pinHash = await bcrypt.hash(pin, 10);
+        // Random variant assignment — with 30-40 teams across VARIANT_COUNT
+        // buckets this spreads out evenly enough (~4-5 teams/variant) without
+        // needing to track a running counter across separate bulk-create calls.
+        const variant = Math.floor(Math.random() * VARIANT_COUNT);
 
         const { data, error } = await supabase
             .from("teams")
-            .insert({ team_name: teamName, pin_hash: pinHash })
-            .select("id, team_name")
+            .insert({ team_name: teamName, pin_hash: pinHash, variant })
+            .select("id, team_name, variant")
             .maybeSingle();
 
         if (error) {
@@ -524,7 +692,7 @@ app.post("/api/admin/teams", requireAdmin, async (req, res) => {
             continue;
         }
 
-        results.push({ teamId: data.id, teamName: data.team_name, pin, ok: true });
+        results.push({ teamId: data.id, teamName: data.team_name, pin, variant: data.variant, ok: true });
     }
 
     res.json({ results });
@@ -534,7 +702,7 @@ app.post("/api/admin/teams", requireAdmin, async (req, res) => {
 app.get("/api/admin/teams", requireAdmin, async (req, res) => {
     const { data, error } = await supabase
         .from("teams")
-        .select("id, team_name, intel, created_at")
+        .select("id, team_name, intel, variant, created_at")
         .order("created_at", { ascending: true });
     if (error) return res.status(500).json({ error: error.message });
     res.json({ teams: data });

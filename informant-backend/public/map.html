@@ -265,6 +265,42 @@
             color: var(--accent-2);
             display: block;
         }
+
+        .node .flavor.loading {
+            color: var(--text-faint);
+            font-style: italic;
+        }
+
+        .modal audio {
+            width: 100%;
+            margin: 0 0 12px;
+        }
+
+        .modal audio[hidden] {
+            display: none;
+        }
+
+        .morse-ref {
+            margin: 0 0 16px;
+            padding: 10px 12px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: .72rem;
+            color: var(--text-dim);
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+            gap: 4px 8px;
+        }
+
+        .morse-ref[hidden] {
+            display: none;
+        }
+
+        .morse-ref span b {
+            color: var(--text);
+        }
     </style>
 </head>
 
@@ -295,6 +331,8 @@
         <div class="modal">
             <h2 id="modalTitle"></h2>
             <p class="flavor" id="modalFlavor"></p>
+            <audio id="modalAudio" controls hidden></audio>
+            <div class="morse-ref" id="morseRef" hidden></div>
             <label for="answerInput">Your answer</label>
             <input id="answerInput" type="text" autocomplete="off" />
             <div class="actions">
@@ -315,30 +353,49 @@
         }
         document.getElementById("teamLabel").textContent = teamName ? teamName.toUpperCase() : "DIGITAL HEIST 2.0";
 
-        // Node flavor text only — never the answers. The real answer key lives
-        // exclusively in server.js and is checked server-side.
+        // Structural node info only (title, runner flag) — the actual puzzle
+        // text is fetched per-team from /api/team/:teamId/nodes, since each
+        // team is assigned a different variant of most puzzles server-side.
+        // The real answer key never leaves server.js.
         const NODES = [
-            { id: 1, title: "Keypad Whisper", runner: false, flavor: "Decode the numbers. A=1…Z=26." },
-            { id: 2, title: "The Broker's Ledger", runner: false, flavor: "Crack the 3-digit constraint lock." },
-            { id: 3, title: "Paper Trail", runner: false, flavor: "Rebuild the record from three facts." },
-            { id: 4, title: "The Landmark", runner: false, flavor: "Answer the riddle." },
-            { id: 5, title: "Drop Point", runner: true, flavor: "Walk to your proctor desk and solve the riddle there." },
-            { id: 6, title: "Signal in the Noise", runner: false, flavor: "Decode the audio clip." },
-            { id: 7, title: "The Ask", runner: true, flavor: "Find the agent wearing gold. Say the phrase." },
-            { id: 8, title: "Anagram of the Mark", runner: false, flavor: "Unscramble the letters." },
-            { id: 9, title: "The Broker's Riddle", runner: false, flavor: "Solve the logic puzzle." },
-            { id: 10, title: "Last Mile", runner: true, flavor: "Crack the physical padlock at the front of the lab." },
+            { id: 1, title: "Keypad Whisper", runner: false },
+            { id: 2, title: "The Broker's Ledger", runner: false },
+            { id: 3, title: "Paper Trail", runner: false },
+            { id: 4, title: "The Landmark", runner: false },
+            { id: 5, title: "Drop Point", runner: true },
+            { id: 6, title: "Signal in the Noise", runner: false },
+            { id: 7, title: "The Ask", runner: true },
+            { id: 8, title: "Anagram of the Mark", runner: false },
+            { id: 9, title: "The Broker's Riddle", runner: false },
+            { id: 10, title: "Last Mile", runner: true },
         ];
 
         const NEEDED_FOR_VAULT = 6;
         let completedNodes = new Set();
         let activeNode = null;
+        // Populated from the server on load: { [nodeId]: { display, audio } }
+        let puzzleText = {};
 
         const grid = document.getElementById("grid");
         const overlay = document.getElementById("overlay");
         const modalTitle = document.getElementById("modalTitle");
         const modalFlavor = document.getElementById("modalFlavor");
+        const modalAudio = document.getElementById("modalAudio");
+        const morseRef = document.getElementById("morseRef");
         const answerInput = document.getElementById("answerInput");
+
+        // Static Morse reference table — always shown alongside the node 6
+        // audio clip, regardless of which of the 8 variant words a team got.
+        // No prior knowledge of Morse is assumed; this is the whole point.
+        const MORSE_TABLE = {
+            A: ".-", B: "-...", C: "-.-.", D: "-..", E: ".", F: "..-.", G: "--.", H: "....",
+            I: "..", J: ".---", K: "-.-", L: ".-..", M: "--", N: "-.", O: "---", P: ".--.",
+            Q: "--.-", R: ".-.", S: "...", T: "-", U: "..-", V: "...-", W: ".--", X: "-..-",
+            Y: "-.--", Z: "--..",
+        };
+        morseRef.innerHTML = Object.entries(MORSE_TABLE)
+            .map(([letter, code]) => `<span><b>${letter}</b> ${code}</span>`)
+            .join("");
         const feedback = document.getElementById("feedback");
         const intelDisplay = document.getElementById("intelDisplay");
         const progressLabel = document.getElementById("progressLabel");
@@ -348,6 +405,8 @@
             grid.innerHTML = "";
             for (const node of NODES) {
                 const done = completedNodes.has(node.id);
+                const text = puzzleText[node.id];
+                const flavor = text ? text.display : "Loading puzzle…";
                 const el = document.createElement("div");
                 el.className = "node" + (done ? " done" : "");
                 el.innerHTML = `
@@ -356,7 +415,7 @@
           ${node.runner ? '<span class="runner">RUNNER</span>' : ""}
         </div>
         <h3>${node.title} ${done ? '<span class="check">&#10003;</span>' : ""}</h3>
-        <p class="flavor">${node.flavor}</p>
+        <p class="flavor${text ? "" : " loading"}">${flavor}</p>
         ${done ? '<div class="shard">Cleared</div>' : ""}
       `;
                 el.addEventListener("click", () => openModal(node));
@@ -373,8 +432,19 @@
 
         function openModal(node) {
             activeNode = node;
+            const text = puzzleText[node.id];
             modalTitle.textContent = `Node ${node.id} — ${node.title}`;
-            modalFlavor.textContent = node.flavor;
+            modalFlavor.textContent = text ? text.display : "Loading puzzle…";
+            if (text && text.audio) {
+                modalAudio.src = API_BASE + text.audio;
+                modalAudio.hidden = false;
+                morseRef.hidden = false;
+            } else {
+                modalAudio.pause();
+                modalAudio.removeAttribute("src");
+                modalAudio.hidden = true;
+                morseRef.hidden = true;
+            }
             answerInput.value = "";
             feedback.className = "feedback";
             overlay.classList.add("open");
@@ -383,6 +453,7 @@
 
         function closeModal() {
             overlay.classList.remove("open");
+            modalAudio.pause();
             activeNode = null;
         }
 
@@ -437,7 +508,20 @@
             }
         }
 
+        async function loadPuzzles() {
+            try {
+                const res = await fetch(API_BASE + "/api/team/" + teamId + "/nodes");
+                const data = await res.json();
+                puzzleText = {};
+                for (const n of data.nodes || []) puzzleText[n.id] = { display: n.display, audio: n.audio };
+                renderGrid();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
         renderGrid();
+        loadPuzzles();
         loadProgress();
     </script>
 </body>
