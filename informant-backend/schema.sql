@@ -76,3 +76,83 @@ create table if not exists informant_sessions (
 alter table informant_sessions enable row level security;
 -- Intentionally no policies added: RLS enabled + zero policies = the
 -- anon and authenticated roles can do nothing on this table at all.
+
+-- ---------------------------------------------------------------------
+-- Sabotage / Intel economy (see the Intel Economy doc). Everything below
+-- is only ever touched by the backend via the service role key — same
+-- "RLS enabled, zero policies" lockdown as the rest of this file.
+-- ---------------------------------------------------------------------
+
+-- Single-row game clock + room-wide GM override. id is always 1.
+create table if not exists game_state (
+  id                  integer primary key default 1,
+  -- Null until an admin hits "Start game" — sabotage stays disabled
+  -- (the opening 8-minute safe window from the doc) until this is set.
+  started_at          timestamptz,
+  sabotage_suspended  boolean not null default false
+);
+insert into game_state (id) values (1) on conflict (id) do nothing;
+
+-- Which node each team currently has open, reported by map.html whenever
+-- a puzzle modal opens/closes. Powers Peek (what a rival is working on)
+-- and Reshuffle (which node to regenerate). Also holds Shield state.
+create table if not exists team_sabotage (
+  team_id              uuid primary key references teams(id) on delete cascade,
+  active_node_id       integer,
+  shield_until         timestamptz,
+  -- Every team starts with one free Shield activation (doc: "one free
+  -- charge") before it starts costing Intel.
+  shield_free_charges  integer not null default 1
+);
+
+-- A node-specific variant override, written by Reshuffle. getNodeDef()
+-- checks this before falling back to the team's global `variant` column,
+-- so a reshuffled node changes on its own without touching every other
+-- node's puzzle (which the team's global variant would otherwise do).
+create table if not exists team_node_variant_overrides (
+  team_id  uuid not null references teams(id) on delete cascade,
+  node_id  integer not null,
+  variant  integer not null,
+  primary key (team_id, node_id)
+);
+
+-- Active timed effects currently applied to a team (Freeze locks
+-- submission, Static Burst just scrambles the display). Expired rows are
+-- harmless and simply ignored by expires_at checks — no cleanup job
+-- needed for a one-night event.
+create table if not exists sabotage_effects (
+  id              uuid primary key default gen_random_uuid(),
+  target_team_id  uuid not null references teams(id) on delete cascade,
+  source_team_id  uuid not null references teams(id) on delete cascade,
+  move            text not null,           -- 'freeze' | 'static_burst'
+  expires_at      timestamptz not null,
+  created_at      timestamptz not null default now()
+);
+
+-- Per (attacker, target, move) cooldown for the offensive moves that have
+-- one (Freeze, Static Burst, Reshuffle — Peek has none).
+create table if not exists sabotage_cooldowns (
+  source_team_id  uuid not null references teams(id) on delete cascade,
+  target_team_id  uuid not null references teams(id) on delete cascade,
+  move            text not null,
+  available_at    timestamptz not null,
+  primary key (source_team_id, target_team_id, move)
+);
+
+-- Log of "disabled seconds" inflicted on a team by Freeze/Reshuffle, used
+-- to enforce the doc's 90-seconds-per-rolling-10-minutes anti-grief cap.
+create table if not exists sabotage_disable_log (
+  id              uuid primary key default gen_random_uuid(),
+  target_team_id  uuid not null references teams(id) on delete cascade,
+  seconds         integer not null,
+  applied_at      timestamptz not null default now()
+);
+
+alter table game_state enable row level security;
+alter table team_sabotage enable row level security;
+alter table team_node_variant_overrides enable row level security;
+alter table sabotage_effects enable row level security;
+alter table sabotage_cooldowns enable row level security;
+alter table sabotage_disable_log enable row level security;
+-- Same story as everywhere else in this file: RLS on, no policies, so
+-- only the service-role backend can touch any of this.
