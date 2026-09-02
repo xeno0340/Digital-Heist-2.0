@@ -224,6 +224,19 @@
             <div class="msg" id="msg"></div>
         </div>
 
+        <div class="card">
+            <h2 style="font-family:monospace;font-size:.95rem;margin:0 0 4px;">Game controls</h2>
+            <p class="hint">Sabotage stays off until you start the game, plus an 8-minute safe window after that. It
+                then stays live for the whole event — a team that reaches the vault just can't be targeted anymore
+                (their rank's locked in), though they can still spend Intel attacking teams still racing.</p>
+            <div class="actions">
+                <button id="startGameBtn" type="button">Start game</button>
+                <button id="suspendBtn" class="secondary" type="button">Suspend sabotage</button>
+                <button id="resumeBtn" class="secondary" type="button">Resume sabotage</button>
+            </div>
+            <div class="msg" id="gameMsg"></div>
+        </div>
+
         <div class="card" id="resultsCard" style="display:none;">
             <h2 style="font-family:monospace;font-size:.95rem;margin:0 0 4px;">Credentials — save or print this now</h2>
             <p class="hint">PINs are shown once and are never stored in plaintext or retrievable again.</p>
@@ -360,6 +373,65 @@
         });
 
         printBtn.addEventListener("click", () => window.print());
+
+        const startGameBtn = document.getElementById("startGameBtn");
+        const suspendBtn = document.getElementById("suspendBtn");
+        const resumeBtn = document.getElementById("resumeBtn");
+        const gameMsg = document.getElementById("gameMsg");
+
+        function showGameMsg(text, ok) {
+            gameMsg.textContent = text;
+            gameMsg.className = "msg " + (ok ? "ok" : "error");
+        }
+
+        async function callAdmin(path, body) {
+            const secret = secretEl.value.trim();
+            if (!secret) { showGameMsg("Enter the admin secret first.", false); return null; }
+            const res = await fetch(API_BASE + path, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "x-admin-secret": secret },
+                body: JSON.stringify(body || {}),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Request failed.");
+            return data;
+        }
+
+        startGameBtn.addEventListener("click", async () => {
+            startGameBtn.disabled = true;
+            try {
+                await callAdmin("/api/admin/game/start");
+                showGameMsg("Game started — sabotage unlocks in 8 minutes.", true);
+            } catch (err) {
+                showGameMsg(err.message, false);
+            } finally {
+                startGameBtn.disabled = false;
+            }
+        });
+
+        suspendBtn.addEventListener("click", async () => {
+            suspendBtn.disabled = true;
+            try {
+                await callAdmin("/api/admin/game/suspend-sabotage", { suspended: true });
+                showGameMsg("Sabotage suspended room-wide.", true);
+            } catch (err) {
+                showGameMsg(err.message, false);
+            } finally {
+                suspendBtn.disabled = false;
+            }
+        });
+
+        resumeBtn.addEventListener("click", async () => {
+            resumeBtn.disabled = true;
+            try {
+                await callAdmin("/api/admin/game/suspend-sabotage", { suspended: false });
+                showGameMsg("Sabotage resumed.", true);
+            } catch (err) {
+                showGameMsg(err.message, false);
+            } finally {
+                resumeBtn.disabled = false;
+            }
+        });
     </script>
 </body>
 
