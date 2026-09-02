@@ -390,6 +390,234 @@
         .lockout {
             color: var(--danger);
         }
+
+        .frozen-banner {
+            display: none;
+            background: rgba(79, 176, 165, .12);
+            border: 1px solid var(--accent-2-dim);
+            color: var(--accent-2);
+            font-family: monospace;
+            font-size: .85rem;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 14px;
+            text-align: center;
+        }
+
+        .frozen-banner.show {
+            display: block;
+        }
+
+        @keyframes glitchShake {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            20% {
+                transform: translate(-2px, 1px);
+            }
+
+            40% {
+                transform: translate(2px, -1px);
+            }
+
+            60% {
+                transform: translate(-1px, 2px);
+            }
+
+            80% {
+                transform: translate(1px, -2px);
+            }
+
+            100% {
+                transform: translate(0, 0);
+            }
+        }
+
+        body.static-burst .wrap {
+            animation: glitchShake .18s infinite;
+        }
+
+        body.static-burst .grid .node,
+        body.static-burst .modal {
+            outline: 2px solid var(--danger);
+            outline-offset: 2px;
+        }
+
+        #staticCanvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 50;
+            display: none;
+            pointer-events: none;
+            opacity: .88;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        #staticCanvas.show {
+            display: block;
+        }
+
+        .sabotage {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 18px 20px;
+            margin-top: 24px;
+        }
+
+        .sabotage h2 {
+            font-family: monospace;
+            font-size: 1rem;
+            margin: 0 0 4px;
+            color: var(--accent);
+        }
+
+        .sabotage .sub {
+            font-size: .82rem;
+            color: var(--text-dim);
+            margin: 0 0 14px;
+        }
+
+        .sab-banner {
+            font-family: monospace;
+            font-size: .8rem;
+            padding: 9px 11px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+
+        .sab-banner.off {
+            background: rgba(154, 164, 180, .1);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+        }
+
+        .sab-banner.on {
+            background: rgba(79, 176, 165, .1);
+            border: 1px solid var(--accent-2-dim);
+            color: var(--accent-2);
+        }
+
+        .sab-incoming {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .sab-incoming .effect {
+            font-family: monospace;
+            font-size: .8rem;
+            padding: 8px 10px;
+            border-radius: 6px;
+            background: rgba(217, 105, 79, .12);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+        }
+
+        .sab-self {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sab-self button {
+            font-family: monospace;
+            padding: 8px 14px;
+            border-radius: 7px;
+            border: 1px solid var(--accent-2-dim);
+            background: var(--accent-2);
+            color: #06231f;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: .82rem;
+        }
+
+        .sab-self button:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        .sab-self .status {
+            font-family: monospace;
+            font-size: .78rem;
+            color: var(--text-dim);
+        }
+
+        .rivals {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .rival-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .rival-row .name {
+            font-weight: 600;
+            min-width: 120px;
+            flex: 1 0 120px;
+        }
+
+        .move-btn {
+            font-family: monospace;
+            font-size: .74rem;
+            padding: 7px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .move-btn:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        .move-btn.danger:hover:not(:disabled) {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .sab-feedback {
+            margin-top: 12px;
+            font-size: .82rem;
+            padding: 9px 11px;
+            border-radius: 6px;
+            display: none;
+            font-family: monospace;
+        }
+
+        .sab-feedback.err {
+            background: rgba(217, 105, 79, .12);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            display: block;
+        }
+
+        .sab-feedback.ok {
+            background: rgba(79, 176, 165, .12);
+            border: 1px solid var(--accent-2);
+            color: var(--accent-2);
+            display: block;
+        }
     </style>
 </head>
 
@@ -404,6 +632,8 @@
     </div>
 
     <div class="wrap">
+        <div class="frozen-banner" id="frozenBanner"></div>
+
         <div class="progress-bar">
             <div class="label">
                 <span>Nodes cleared</span>
@@ -426,7 +656,22 @@
         </div>
 
         <div class="grid" id="grid"></div>
+
+        <div class="sabotage">
+            <h2>SABOTAGE</h2>
+            <p class="sub">Spend Intel to mess with rivals. Every move here comes straight out of your final score.</p>
+            <div class="sab-banner" id="sabBanner"></div>
+            <div class="sab-incoming" id="sabIncoming"></div>
+            <div class="sab-self">
+                <button id="shieldBtn" type="button">Shield</button>
+                <span class="status" id="shieldStatus"></span>
+            </div>
+            <div class="rivals" id="rivalsList"></div>
+            <div class="sab-feedback" id="sabFeedback"></div>
+        </div>
     </div>
+
+    <canvas id="staticCanvas"></canvas>
 
     <div class="overlay" id="overlay">
         <div class="modal">
@@ -476,6 +721,10 @@
         let shardCodes = {}; // { [nodeId]: "H1" } for cleared nodes, from the server
         let vaultReached = false;
         let activeNode = null;
+        let staticBurstActive = false;
+        let glitchInterval = null;
+        let reshuffleActive = false;
+        let reshuffleInterval = null;
         let lockoutTimer = null;
         // Populated from the server on load: { [nodeId]: { display, audio } }
         let puzzleText = {};
@@ -506,12 +755,138 @@
         const progressLabel = document.getElementById("progressLabel");
         const progressFill = document.getElementById("progressFill");
 
+        // Static Burst actually scrambles the puzzle text while it's active —
+        // not just a screen-shake decoration. A team under it can still submit
+        // (nothing here blocks that), but re-reading the clue is genuinely
+        // hard, matching the doc: "confusing, not blocking; they can still
+        // submit correctly if they know the answer."
+        const GLITCH_CHARS = "!@#$%^&*<>?/\\|~▓▒░01";
+        function glitchify(text) {
+            return text.replace(/\S/g, (ch) => (Math.random() < 0.45 ? GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)] : ch));
+        }
+
+        // Reshuffle jumbles every word into an anagram of itself — real letters,
+        // shuffled order — a different kind of unreadable than Static Burst's
+        // symbol-glitch, so the two moves feel distinct when both are active.
+        function jumbleText(text) {
+            return text.replace(/[A-Za-z0-9]+/g, (word) => {
+                const chars = word.split("");
+                for (let i = chars.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [chars[i], chars[j]] = [chars[j], chars[i]];
+                }
+                return chars.join("");
+            });
+        }
+
+        // Applies whichever obscuring effects are currently active, in order —
+        // used everywhere puzzle text gets displayed so Freeze/Static
+        // Burst/Reshuffle combine correctly no matter which one just toggled.
+        function obscureText(text) {
+            let out = text;
+            if (reshuffleActive) out = jumbleText(out);
+            if (staticBurstActive) out = glitchify(out);
+            return out;
+        }
+
+        // Full-screen CRT-style noise, layered on top of everything while
+        // Static Burst is active. Drawn at a deliberately low resolution
+        // (scaled up with pixelated rendering) so it reads as chunky old-TV
+        // static rather than a smooth gradient, and stays cheap to redraw many
+        // times a second. pointer-events:none on the canvas means clicks and
+        // typing still reach the real page underneath — this only blocks
+        // *reading*, never submitting, matching the doc's "confusing, not
+        // blocking."
+        const staticCanvas = document.getElementById("staticCanvas");
+        const staticCtx = staticCanvas.getContext("2d");
+        let staticNoiseTimer = null;
+
+        function drawStaticFrame() {
+            const w = staticCanvas.width;
+            const h = staticCanvas.height;
+            const imgData = staticCtx.createImageData(w, h);
+            const buf = imgData.data;
+            for (let i = 0; i < buf.length; i += 4) {
+                const v = (Math.random() * 255) | 0;
+                buf[i] = v; buf[i + 1] = v; buf[i + 2] = v; buf[i + 3] = 255;
+            }
+            staticCtx.putImageData(imgData, 0, 0);
+        }
+
+        function startStaticNoise() {
+            staticCanvas.width = 160;
+            staticCanvas.height = 100;
+            staticCanvas.classList.add("show");
+            clearInterval(staticNoiseTimer);
+            staticNoiseTimer = setInterval(drawStaticFrame, 70);
+            drawStaticFrame();
+        }
+
+        function stopStaticNoise() {
+            clearInterval(staticNoiseTimer);
+            staticNoiseTimer = null;
+            staticCanvas.classList.remove("show");
+        }
+
+        function setStaticBurst(active) {
+            if (active === staticBurstActive) return;
+            staticBurstActive = active;
+            document.body.classList.toggle("static-burst", active);
+            clearInterval(glitchInterval);
+            if (active) {
+                startStaticNoise();
+                // Re-glitch every 250ms so it reads as live static, not a static image.
+                glitchInterval = setInterval(() => {
+                    renderGrid();
+                    if (activeNode) {
+                        const text = puzzleText[activeNode.id];
+                        if (text) modalFlavor.textContent = obscureText(text.display);
+                    }
+                }, 250);
+            } else {
+                stopStaticNoise();
+                renderGrid();
+                if (activeNode) {
+                    const text = puzzleText[activeNode.id];
+                    modalFlavor.textContent = text ? obscureText(text.display) : "Loading puzzle…";
+                }
+            }
+        }
+
+        function setReshuffle(active) {
+            if (active === reshuffleActive) return;
+            reshuffleActive = active;
+            clearInterval(reshuffleInterval);
+            if (active) {
+                // Re-jumble every 300ms so the letters keep tumbling rather than
+                // sitting on one static anagram.
+                reshuffleInterval = setInterval(() => {
+                    renderGrid();
+                    if (activeNode) {
+                        const text = puzzleText[activeNode.id];
+                        if (text) modalFlavor.textContent = obscureText(text.display);
+                    }
+                }, 300);
+            } else {
+                renderGrid();
+                if (activeNode) {
+                    const text = puzzleText[activeNode.id];
+                    modalFlavor.textContent = text ? obscureText(text.display) : "Loading puzzle…";
+                }
+            }
+        }
+
         function renderGrid() {
             grid.innerHTML = "";
             for (const node of NODES) {
                 const done = completedNodes.has(node.id);
                 const text = puzzleText[node.id];
-                const flavor = text ? text.display : "Loading puzzle…";
+                let flavor = text ? text.display : "Loading puzzle…";
+                let title = node.title;
+                if (text && !done && (staticBurstActive || reshuffleActive)) {
+                    flavor = obscureText(flavor);
+                    if (reshuffleActive) title = jumbleText(title);
+                }
                 const el = document.createElement("div");
                 el.className = "node" + (done ? " done" : "");
                 el.innerHTML = `
@@ -519,7 +894,7 @@
           <span>NODE ${String(node.id).padStart(2, "0")}</span>
           ${node.runner ? '<span class="runner">RUNNER</span>' : ""}
         </div>
-        <h3>${node.title} ${done ? '<span class="check">&#10003;</span>' : ""}</h3>
+        <h3>${title} ${done ? '<span class="check">&#10003;</span>' : ""}</h3>
         <p class="flavor${text ? "" : " loading"}">${flavor}</p>
         ${done ? '<div class="shard">Cleared</div>' : ""}
       `;
@@ -594,6 +969,10 @@
                         : `Vault opened! Arrival order: #${data.arrivalRank ?? "?"}.`;
                     vaultFeedback.className = "feedback ok";
                     renderVault();
+                } else if (data.frozen) {
+                    vaultFeedback.textContent = `Frozen by a rival — try again in ${data.secondsLeft}s.`;
+                    vaultFeedback.className = "feedback err";
+                    startFrozenCountdown(data.secondsLeft);
                 } else {
                     vaultFeedback.textContent = data.error || "That's not it — check your shard codes and try again.";
                     vaultFeedback.className = "feedback err";
@@ -611,9 +990,10 @@
 
         function openModal(node) {
             activeNode = node;
+            setActiveNode(node.id);
             const text = puzzleText[node.id];
             modalTitle.textContent = `Node ${node.id} — ${node.title}`;
-            modalFlavor.textContent = text ? text.display : "Loading puzzle…";
+            modalFlavor.textContent = text ? obscureText(text.display) : "Loading puzzle…";
             if (text && text.audio) {
                 modalAudio.src = API_BASE + text.audio;
                 modalAudio.hidden = false;
@@ -637,6 +1017,7 @@
             modalAudio.pause();
             clearInterval(lockoutTimer);
             activeNode = null;
+            setActiveNode(null);
         }
 
         document.getElementById("cancelBtn").addEventListener("click", closeModal);
@@ -685,6 +1066,10 @@
                 if (!data.alreadyCompleted) updateProgressUI(data.totalIntel);
                 else renderVault();
                 setTimeout(closeModal, 1400);
+            } else if (data.frozen) {
+                feedback.textContent = `Frozen by a rival — try again in ${data.secondsLeft}s.`;
+                feedback.className = "feedback err lockout";
+                startFrozenCountdown(data.secondsLeft);
             } else if (data.secondsLeft) {
                 // Wrong guess (or already-locked node) — start/refresh the
                 // per-node lockout countdown instead of letting the team spam it.
@@ -726,6 +1111,213 @@
                 puzzleText = {};
                 for (const n of data.nodes || []) puzzleText[n.id] = { display: n.display, audio: n.audio };
                 renderGrid();
+                if (activeNode) {
+                    const text = puzzleText[activeNode.id];
+                    if (text) modalFlavor.textContent = obscureText(text.display);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // ---------------------------------------------------------------------
+        // Sabotage panel — polls /api/sabotage/state/:teamId every few seconds
+        // for incoming effects, cooldowns, and Shield status. Freeze also comes
+        // back inline on a blocked /api/node/submit or /api/vault/submit call
+        // (handled above), so a team can't out-poll it by submitting fast.
+        // ---------------------------------------------------------------------
+        const sabBanner = document.getElementById("sabBanner");
+        const sabIncoming = document.getElementById("sabIncoming");
+        const shieldBtn = document.getElementById("shieldBtn");
+        const shieldStatus = document.getElementById("shieldStatus");
+        const rivalsList = document.getElementById("rivalsList");
+        const sabFeedback = document.getElementById("sabFeedback");
+        const frozenBanner = document.getElementById("frozenBanner");
+
+        let frozenUntilTs = null;
+        let frozenTimer = null;
+        let sabFeedbackTimer = null;
+
+        function showSabFeedback(text, ok) {
+            sabFeedback.textContent = text;
+            sabFeedback.className = "sab-feedback " + (ok ? "ok" : "err");
+            clearTimeout(sabFeedbackTimer);
+            sabFeedbackTimer = setTimeout(() => { sabFeedback.className = "sab-feedback"; }, 5000);
+        }
+
+        function setActiveNode(nodeId) {
+            fetch(API_BASE + "/api/sabotage/active-node", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ teamId, nodeId }),
+            }).catch(() => { });
+        }
+
+        function startFrozenCountdown(seconds) {
+            frozenUntilTs = Date.now() + seconds * 1000;
+            submitAnswerBtn.disabled = true;
+            vaultSubmitBtn.disabled = true;
+            clearInterval(frozenTimer);
+            const tick = () => {
+                const remaining = Math.ceil((frozenUntilTs - Date.now()) / 1000);
+                if (remaining <= 0) {
+                    clearInterval(frozenTimer);
+                    frozenUntilTs = null;
+                    frozenBanner.classList.remove("show");
+                    submitAnswerBtn.disabled = false;
+                    vaultSubmitBtn.disabled = false;
+                    return;
+                }
+                frozenBanner.textContent = `FROZEN — a rival locked your team out for ${remaining}s.`;
+                frozenBanner.classList.add("show");
+            };
+            tick();
+            frozenTimer = setInterval(tick, 1000);
+        }
+
+        function renderSabotage(data) {
+            if (data.sabotageEnabled) {
+                sabBanner.className = "sab-banner on";
+                sabBanner.textContent = "Sabotage is live.";
+            } else {
+                sabBanner.className = "sab-banner off";
+                sabBanner.textContent = data.sabotageDisabledReason || "Sabotage is disabled.";
+            }
+
+            sabIncoming.innerHTML = "";
+            let incomingFreeze = null;
+            let incomingStatic = false;
+            let incomingReshuffle = false;
+            for (const eff of data.incoming || []) {
+                if (eff.move === "freeze") incomingFreeze = eff;
+                if (eff.move === "static_burst") incomingStatic = true;
+                if (eff.move === "reshuffle") incomingReshuffle = true;
+                const el = document.createElement("div");
+                el.className = "effect";
+                const label = eff.move === "freeze" ? "FREEZE" : eff.move === "static_burst" ? "STATIC BURST" : eff.move === "reshuffle" ? "RESHUFFLE" : eff.move.toUpperCase();
+                el.textContent = `${label} from ${eff.sourceTeamName} — ${eff.secondsLeft}s left`;
+                sabIncoming.appendChild(el);
+            }
+            setReshuffle(incomingReshuffle);
+
+            if (incomingFreeze && !frozenUntilTs) {
+                startFrozenCountdown(incomingFreeze.secondsLeft);
+            } else if (!incomingFreeze && frozenUntilTs) {
+                clearInterval(frozenTimer);
+                frozenUntilTs = null;
+                frozenBanner.classList.remove("show");
+                submitAnswerBtn.disabled = false;
+                vaultSubmitBtn.disabled = false;
+            }
+
+            setStaticBurst(incomingStatic);
+
+            const shieldActive = data.shieldUntil && new Date(data.shieldUntil) > new Date();
+            if (shieldActive) {
+                const secs = Math.ceil((new Date(data.shieldUntil) - new Date()) / 1000);
+                shieldStatus.textContent = `Active — ${secs}s left`;
+            } else if (data.shieldFreeCharges > 0) {
+                shieldStatus.textContent = "1 free charge available";
+            } else {
+                shieldStatus.textContent = `Costs ${data.moves.shield.cost} Intel`;
+            }
+            shieldBtn.disabled = !!shieldActive || !data.sabotageEnabled;
+
+            rivalsList.innerHTML = "";
+            for (const rival of data.rivals || []) {
+                const row = document.createElement("div");
+                row.className = "rival-row";
+
+                if (rival.vaultReached) {
+                    // Already finished — their rank's locked in, nothing left to hit.
+                    row.innerHTML = `<span class="name">${rival.teamName}</span><span class="status">Reached the vault — can't be targeted</span>`;
+                    rivalsList.appendChild(row);
+                    continue;
+                }
+
+                const peekDisabled = !data.sabotageEnabled || data.intel < data.moves.peek.cost;
+                const freezeDisabled = !data.sabotageEnabled || data.intel < data.moves.freeze.cost || rival.cooldowns.freeze > 0;
+                const staticDisabled = !data.sabotageEnabled || data.intel < data.moves.static_burst.cost || rival.cooldowns.static_burst > 0;
+                const reshuffleDisabled = !data.sabotageEnabled || data.intel < data.moves.reshuffle.cost || rival.cooldowns.reshuffle > 0;
+                row.innerHTML = `
+        <span class="name">${rival.teamName}</span>
+        <button class="move-btn" data-move="peek" ${peekDisabled ? "disabled" : ""}>Peek (${data.moves.peek.cost})</button>
+        <button class="move-btn danger" data-move="freeze" ${freezeDisabled ? "disabled" : ""}>${rival.cooldowns.freeze > 0 ? `Freeze (${rival.cooldowns.freeze}s)` : `Freeze (${data.moves.freeze.cost})`}</button>
+        <button class="move-btn danger" data-move="static_burst" ${staticDisabled ? "disabled" : ""}>${rival.cooldowns.static_burst > 0 ? `Static (${rival.cooldowns.static_burst}s)` : `Static (${data.moves.static_burst.cost})`}</button>
+        <button class="move-btn danger" data-move="reshuffle" ${reshuffleDisabled ? "disabled" : ""}>${rival.cooldowns.reshuffle > 0 ? `Reshuffle (${rival.cooldowns.reshuffle}s)` : `Reshuffle (${data.moves.reshuffle.cost})`}</button>
+      `;
+                row.querySelectorAll(".move-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => runSabotageMove(btn.dataset.move, rival.teamId, rival.teamName));
+                });
+                rivalsList.appendChild(row);
+            }
+        }
+
+        async function runSabotageMove(move, targetTeamId, targetTeamName) {
+            const endpoints = {
+                peek: "/api/sabotage/peek",
+                freeze: "/api/sabotage/freeze",
+                static_burst: "/api/sabotage/static-burst",
+                reshuffle: "/api/sabotage/reshuffle",
+            };
+            const path = endpoints[move];
+            if (!path) return;
+            try {
+                const res = await fetch(API_BASE + path, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ teamId, targetTeamId }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    showSabFeedback(data.error || "Couldn't do that.", false);
+                    return;
+                }
+                if (move === "peek") {
+                    const nodeLabel = data.activeNodeId ? `Node ${data.activeNodeId}` : "nothing open right now";
+                    showSabFeedback(`${targetTeamName} is on: ${nodeLabel}.`, true);
+                } else if (data.applied === false) {
+                    showSabFeedback(data.message || `${targetTeamName} resisted that.`, false);
+                } else {
+                    const labels = { freeze: "Froze", static_burst: "Static-burst", reshuffle: "Reshuffled" };
+                    showSabFeedback(`${labels[move] || "Hit"} ${targetTeamName}.`, true);
+                }
+                loadProgress();
+                fetchSabotageState();
+            } catch (e) {
+                showSabFeedback("Couldn't reach the server — try again.", false);
+            }
+        }
+
+        shieldBtn.addEventListener("click", async () => {
+            shieldBtn.disabled = true;
+            try {
+                const res = await fetch(API_BASE + "/api/sabotage/shield", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ teamId }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    showSabFeedback(data.error || "Couldn't activate Shield.", false);
+                    return;
+                }
+                showSabFeedback(data.usedFreeCharge ? "Shield activated (free charge used)." : "Shield activated.", true);
+                loadProgress();
+                fetchSabotageState();
+            } catch (e) {
+                showSabFeedback("Couldn't reach the server — try again.", false);
+            } finally {
+                shieldBtn.disabled = false;
+            }
+        });
+
+        async function fetchSabotageState() {
+            try {
+                const res = await fetch(API_BASE + "/api/sabotage/state/" + teamId);
+                const data = await res.json();
+                if (!res.ok) return;
+                renderSabotage(data);
             } catch (e) {
                 console.error(e);
             }
@@ -734,6 +1326,11 @@
         renderGrid();
         loadPuzzles();
         loadProgress();
+        fetchSabotageState();
+        setInterval(fetchSabotageState, 4000);
+        // Also re-poll puzzle text on the same cadence — this is what makes a
+        // rival's Reshuffle actually show up without a manual page refresh.
+        setInterval(loadPuzzles, 4000);
     </script>
 </body>
 
