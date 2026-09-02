@@ -377,6 +377,24 @@ const NEEDED_FOR_VAULT = 6;
 // before the next attempt, correct or not — carried over from v1.
 const WRONG_ANSWER_LOCKOUT_SECONDS = 20;
 
+// ---------------------------------------------------------------------
+// 5c-0. Scoring, straight from the Intel Economy doc's "Final scoring"
+// table: banked Intel (earned minus sabotage spend, once sabotage exists)
+// + a flat per-node-cleared bonus + a one-time bonus keyed to the order
+// a team reached the vault (1st/2nd/3rd get their own tier, 4th-10th
+// share a tier, 11th+ gets nothing extra).
+// ---------------------------------------------------------------------
+const NODE_CLEARED_BONUS = 5;
+
+function arrivalBonusForRank(rank) {
+    if (!rank) return 0;
+    if (rank === 1) return 50;
+    if (rank === 2) return 35;
+    if (rank === 3) return 25;
+    if (rank <= 10) return 15;
+    return 0;
+}
+
 function requireAdmin(req, res, next) {
     const provided = req.get("x-admin-secret");
     if (!ADMIN_SECRET || !provided || provided !== ADMIN_SECRET) {
@@ -667,6 +685,23 @@ app.get("/api/team/:teamId/progress", async (req, res) => {
     const shardCodes = {};
     for (const id of nodesCleared) shardCodes[id] = getShardCode(id);
 
+    // Live score, same formula as /api/leaderboard: banked Intel + a flat
+    // per-node bonus + (once they've reached the vault) the arrival-order
+    // bonus. Lets a team see roughly where they stand without exposing
+    // anyone else's numbers.
+    const nodeBonus = nodesCleared.length * NODE_CLEARED_BONUS;
+    let arrivalRank = null;
+    if (team.vault_reached_at) {
+        const { count: rankCount, error: rankErr } = await supabase
+            .from("teams")
+            .select("id", { count: "exact", head: true })
+            .not("vault_reached_at", "is", null)
+            .lte("vault_reached_at", team.vault_reached_at);
+        if (!rankErr) arrivalRank = rankCount;
+    }
+    const arrivalBonus = arrivalBonusForRank(arrivalRank);
+    const score = team.intel + nodeBonus + arrivalBonus;
+
     res.json({
         intel: team.intel,
         nodesCleared,
@@ -674,6 +709,10 @@ app.get("/api/team/:teamId/progress", async (req, res) => {
         neededForVault: NEEDED_FOR_VAULT,
         vaultReached: !!team.vault_reached_at,
         vaultReachedAt: team.vault_reached_at,
+        nodeBonus,
+        arrivalRank,
+        arrivalBonus,
+        score,
     });
 });
 
@@ -721,7 +760,19 @@ app.post("/api/vault/submit", async (req, res) => {
     }
 
     if (team.vault_reached_at) {
-        return res.json({ correct: true, alreadyReached: true, reachedAt: team.vault_reached_at });
+        const { count: rankCount, error: rankErr } = await supabase
+            .from("teams")
+            .select("id", { count: "exact", head: true })
+            .not("vault_reached_at", "is", null)
+            .lte("vault_reached_at", team.vault_reached_at);
+        const rank = rankErr ? null : rankCount;
+        return res.json({
+            correct: true,
+            alreadyReached: true,
+            reachedAt: team.vault_reached_at,
+            arrivalRank: rank,
+            arrivalBonus: arrivalBonusForRank(rank),
+        });
     }
 
     const reachedAt = new Date().toISOString();
@@ -743,12 +794,84 @@ app.post("/api/vault/submit", async (req, res) => {
         .lte("vault_reached_at", reachedAt);
     if (countErr) console.error("Arrival rank lookup failed:", countErr.message);
 
+    const arrivalRank = countErr ? null : count;
     res.json({
         correct: true,
         alreadyReached: false,
         reachedAt,
-        arrivalRank: countErr ? null : count,
+        arrivalRank,
+        arrivalBonus: arrivalBonusForRank(arrivalRank),
     });
+});
+
+// ---------------------------------------------------------------------
+// 5c-3. Leaderboard — the "big screen" read-only view from the design
+// doc. Deliberately unauthenticated (team names + scores only, never
+// PINs or answers) so it can run on a projector without anyone logged
+// in. Same scoring formula as the Intel Economy doc's "Final scoring"
+// table: banked Intel + a flat node-cleared bonus + a one-time bonus
+// keyed to vault arrival order.
+// ---------------------------------------------------------------------
+app.get("/api/leaderboard", async (req, res) => {
+    const { data: teams, error: teamsErr } = await supabase
+        .from("teams")
+        .select("id, team_name, intel, vault_reached_at");
+    if (teamsErr) {
+        console.error("Leaderboard teams lookup failed:", teamsErr.message);
+        return res.status(500).json({ error: "Couldn't load the leaderboard. Try again." });
+    }
+
+    const { data: completions, error: compErr } = await supabase
+        .from("node_completions")
+        .select("team_id");
+    if (compErr) {
+        console.error("Leaderboard completions lookup failed:", compErr.message);
+        return res.status(500).json({ error: "Couldn't load the leaderboard. Try again." });
+    }
+
+    const nodesClearedByTeam = {};
+    for (const row of completions || []) {
+        nodesClearedByTeam[row.team_id] = (nodesClearedByTeam[row.team_id] || 0) + 1;
+    }
+
+    // Arrival rank comes from vault_reached_at order, not insertion order —
+    // ties (same millisecond) fall back to team_name so the ordering is
+    // at least deterministic and doesn't flicker between polls.
+    const arrived = (teams || [])
+        .filter((t) => t.vault_reached_at)
+        .sort((a, b) => {
+            const diff = new Date(a.vault_reached_at) - new Date(b.vault_reached_at);
+            return diff !== 0 ? diff : a.team_name.localeCompare(b.team_name);
+        });
+    const rankByTeamId = {};
+    arrived.forEach((t, i) => { rankByTeamId[t.id] = i + 1; });
+
+    const rows = (teams || []).map((t) => {
+        const nodesCleared = nodesClearedByTeam[t.id] || 0;
+        const nodeBonus = nodesCleared * NODE_CLEARED_BONUS;
+        const arrivalRank = rankByTeamId[t.id] || null;
+        const arrivalBonus = arrivalBonusForRank(arrivalRank);
+        return {
+            teamName: t.team_name,
+            bankedIntel: t.intel,
+            nodesCleared,
+            nodeBonus,
+            vaultReached: !!t.vault_reached_at,
+            vaultReachedAt: t.vault_reached_at,
+            arrivalRank,
+            arrivalBonus,
+            totalScore: t.intel + nodeBonus + arrivalBonus,
+        };
+    });
+
+    rows.sort((a, b) => {
+        if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
+        if (a.vaultReached !== b.vaultReached) return a.vaultReached ? -1 : 1;
+        if (a.vaultReached && b.vaultReached) return a.arrivalRank - b.arrivalRank;
+        return a.teamName.localeCompare(b.teamName);
+    });
+
+    res.json({ leaderboard: rows, nodeClearedBonus: NODE_CLEARED_BONUS });
 });
 
 // GET /api/team/:teamId/nodes — the puzzle text for this team's assigned

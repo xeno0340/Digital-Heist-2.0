@@ -398,6 +398,7 @@
         <h1 id="teamLabel">DIGITAL HEIST 2.0</h1>
         <div class="right">
             <span>Intel: <span class="intel" id="intelDisplay">0</span></span>
+            <span>Score: <span class="intel" id="scoreDisplay">0</span></span>
             <span class="logout" id="logoutBtn">Log out</span>
         </div>
     </div>
@@ -501,6 +502,7 @@
             .join("");
         const feedback = document.getElementById("feedback");
         const intelDisplay = document.getElementById("intelDisplay");
+        const scoreDisplay = document.getElementById("scoreDisplay");
         const progressLabel = document.getElementById("progressLabel");
         const progressFill = document.getElementById("progressFill");
 
@@ -526,8 +528,9 @@
             }
         }
 
-        function updateProgressUI(intel) {
+        function updateProgressUI(intel, score) {
             intelDisplay.textContent = intel;
+            if (score !== undefined) scoreDisplay.textContent = score;
             const cleared = completedNodes.size;
             progressLabel.textContent = `${cleared} / ${NEEDED_FOR_VAULT} needed for the vault`;
             progressFill.style.width = Math.min(100, (cleared / NEEDED_FOR_VAULT) * 100) + "%";
@@ -710,7 +713,7 @@
                 vaultReached = !!data.vaultReached;
                 if (data.neededForVault) NEEDED_FOR_VAULT = data.neededForVault;
                 renderGrid();
-                updateProgressUI(data.intel || 0);
+                updateProgressUI(data.intel || 0, data.score);
             } catch (e) {
                 console.error(e);
             }

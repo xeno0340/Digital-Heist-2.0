@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Digital Heist 2.0 — Leaderboard</title>
+    <style>
+        :root {
+            --bg: #0b0e14;
+            --surface: #12161f;
+            --surface-2: #1a212c;
+            --border: #252e3c;
+            --text: #e9edf3;
+            --text-dim: #9aa4b4;
+            --text-faint: #66707f;
+            --accent: #e8b04b;
+            --accent-dim: #8a6a2e;
+            --accent-2: #4fb0a5;
+            --accent-2-dim: #2c6a63;
+            --gold: #e8b04b;
+            --silver: #c7d0dc;
+            --bronze: #c9814a;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', sans-serif;
+            padding: 28px 40px;
+        }
+
+        .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 22px;
+        }
+
+        h1 {
+            font-family: monospace;
+            font-size: 1.8rem;
+            margin: 0;
+            letter-spacing: .02em;
+        }
+
+        .sub {
+            color: var(--text-dim);
+            font-size: 1rem;
+            margin: 6px 0 0;
+        }
+
+        .status {
+            font-family: monospace;
+            font-size: .85rem;
+            color: var(--text-faint);
+            text-align: right;
+        }
+
+        .status b {
+            color: var(--accent-2);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        thead th {
+            text-align: left;
+            padding: 14px 18px;
+            background: var(--surface-2);
+            color: var(--text-dim);
+            font-family: monospace;
+            font-size: .8rem;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tbody td {
+            padding: 16px 18px;
+            border-bottom: 1px solid var(--border);
+            font-size: 1.15rem;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr.rank-1 {
+            background: rgba(232, 176, 75, .09);
+        }
+
+        tbody tr.rank-2 {
+            background: rgba(199, 208, 220, .06);
+        }
+
+        tbody tr.rank-3 {
+            background: rgba(201, 129, 74, .07);
+        }
+
+        .rank {
+            font-family: monospace;
+            font-weight: 700;
+            font-size: 1.3rem;
+            width: 60px;
+        }
+
+        .rank-1 .rank {
+            color: var(--gold);
+        }
+
+        .rank-2 .rank {
+            color: var(--silver);
+        }
+
+        .rank-3 .rank {
+            color: var(--bronze);
+        }
+
+        .team {
+            font-weight: 600;
+        }
+
+        .num {
+            font-family: monospace;
+            text-align: right;
+        }
+
+        .score {
+            font-family: monospace;
+            font-weight: 700;
+            font-size: 1.3rem;
+            color: var(--accent-2);
+            text-align: right;
+        }
+
+        .badge {
+            display: inline-block;
+            font-family: monospace;
+            font-size: .72rem;
+            padding: 3px 8px;
+            border-radius: 5px;
+            letter-spacing: .04em;
+        }
+
+        .badge.vault {
+            background: rgba(79, 176, 165, .15);
+            color: var(--accent-2);
+            border: 1px solid var(--accent-2-dim);
+        }
+
+        .badge.arrival {
+            background: rgba(232, 176, 75, .15);
+            color: var(--accent);
+            border: 1px solid var(--accent-dim);
+            margin-left: 6px;
+        }
+
+        .empty {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--text-faint);
+            font-family: monospace;
+        }
+
+        .err {
+            color: #d9694f;
+            font-family: monospace;
+            font-size: .85rem;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="top">
+        <div>
+            <h1>DIGITAL HEIST 2.0 — LEADERBOARD</h1>
+            <p class="sub">Banked Intel + node bonus + vault arrival bonus. Updates live.</p>
+        </div>
+        <div class="status">
+            <span id="teamCount">—</span> teams · last updated <b id="updatedAt">—</b>
+            <div class="err" id="err"></div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Team</th>
+                <th style="text-align:right">Nodes</th>
+                <th style="text-align:right">Node bonus</th>
+                <th style="text-align:right">Banked intel</th>
+                <th style="text-align:right">Arrival bonus</th>
+                <th style="text-align:right">Score</th>
+            </tr>
+        </thead>
+        <tbody id="rows">
+            <tr>
+                <td colspan="7" class="empty">Loading…</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+        const API_BASE = "";
+        const rowsEl = document.getElementById("rows");
+        const updatedAtEl = document.getElementById("updatedAt");
+        const teamCountEl = document.getElementById("teamCount");
+        const errEl = document.getElementById("err");
+
+        function ordinal(n) {
+            if (!n) return "";
+            const s = ["th", "st", "nd", "rd"], v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        }
+
+        function render(rows) {
+            if (!rows.length) {
+                rowsEl.innerHTML = `<tr><td colspan="7" class="empty">No teams yet — create some in the admin panel.</td></tr>`;
+                return;
+            }
+            rowsEl.innerHTML = rows.map((r, i) => {
+                const rank = i + 1;
+                const rankClass = rank <= 3 ? `rank-${rank}` : "";
+                const vaultBadge = r.vaultReached
+                    ? `<span class="badge vault">VAULT</span>${r.arrivalRank ? `<span class="badge arrival">#${r.arrivalRank}</span>` : ""}`
+                    : "";
+                return `
+        <tr class="${rankClass}">
+          <td class="rank">${rank}</td>
+          <td class="team">${r.teamName} ${vaultBadge}</td>
+          <td class="num">${r.nodesCleared}</td>
+          <td class="num">+${r.nodeBonus}</td>
+          <td class="num">${r.bankedIntel}</td>
+          <td class="num">+${r.arrivalBonus}</td>
+          <td class="score">${r.totalScore}</td>
+        </tr>`;
+            }).join("");
+        }
+
+        async function refresh() {
+            try {
+                const res = await fetch(API_BASE + "/api/leaderboard");
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Request failed.");
+                render(data.leaderboard);
+                teamCountEl.textContent = data.leaderboard.length;
+                updatedAtEl.textContent = new Date().toLocaleTimeString();
+                errEl.textContent = "";
+            } catch (e) {
+                errEl.textContent = "Couldn't refresh: " + e.message;
+            }
+        }
+
+        refresh();
+        setInterval(refresh, 4000);
+    </script>
+</body>
+
+</html>
