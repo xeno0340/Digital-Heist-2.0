@@ -19,13 +19,18 @@ create table if not exists teams (
   -- at creation time — see VARIANT_NODES in server.js. Keeps nearby teams
   -- from working the exact same puzzle instance.
   variant      integer not null default 0,
+  -- Set once, the moment a team successfully submits the vault code.
+  -- Null = hasn't reached the vault yet. Used to compute arrival order
+  -- for the scoring bonus (see the Intel Economy doc).
+  vault_reached_at timestamptz,
   created_at   timestamptz not null default now()
 );
 
 -- If you already ran an earlier version of this schema (teams table
--- exists but has no variant column yet), run this instead of the create
--- table above — safe to run even if the column already exists:
+-- exists but is missing newer columns), these are safe to run even if
+-- the column already exists — they only add what's missing:
 -- alter table teams add column if not exists variant integer not null default 0;
+-- alter table teams add column if not exists vault_reached_at timestamptz;
 
 -- Which nodes each team has cleared. One row per (team, node) — the
 -- primary key doubles as the "already completed" guard so a resubmit of
@@ -37,9 +42,20 @@ create table if not exists node_completions (
   primary key (team_id, node_id)
 );
 
+-- Per-team, per-node wrong-answer lockout (carried over from v1): a
+-- wrong guess locks that node for 20 seconds before the next attempt,
+-- correct or not. One row per (team, node) currently in a lockout.
+create table if not exists node_lockouts (
+  team_id      uuid not null references teams(id) on delete cascade,
+  node_id      integer not null,
+  locked_until timestamptz not null,
+  primary key (team_id, node_id)
+);
+
 alter table teams enable row level security;
 alter table node_completions enable row level security;
--- Intentionally no policies added on either table: RLS enabled + zero
+alter table node_lockouts enable row level security;
+-- Intentionally no policies added on any of these: RLS enabled + zero
 -- policies = the anon/authenticated roles can do nothing on them at all.
 -- Only this backend, using the service role key, can read or write teams,
 -- PIN hashes, or progress.

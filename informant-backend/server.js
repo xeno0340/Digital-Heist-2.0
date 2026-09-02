@@ -361,6 +361,22 @@ function normalizeAnswer(s) {
     return String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+// Shard codes are fixed per node id regardless of variant (see the
+// comment above VARIANT_NODES) — this pulls just that, without needing
+// a variant index, for building/checking a team's vault code.
+function getShardCode(nodeId) {
+    if (FIXED_NODES[nodeId]) return FIXED_NODES[nodeId].shardCode;
+    return VARIANT_NODES[nodeId] ? VARIANT_NODES[nodeId].shardCode : null;
+}
+
+// How many cleared nodes unlock the vault — mirrors NEEDED_FOR_VAULT in
+// map.html. Keep both in sync if you change this.
+const NEEDED_FOR_VAULT = 6;
+
+// A wrong guess locks that node (for that team) for this many seconds
+// before the next attempt, correct or not — carried over from v1.
+const WRONG_ANSWER_LOCKOUT_SECONDS = 20;
+
 function requireAdmin(req, res, next) {
     const provided = req.get("x-admin-secret");
     if (!ADMIN_SECRET || !provided || provided !== ADMIN_SECRET) {
@@ -528,8 +544,31 @@ app.post("/api/node/submit", async (req, res) => {
     const nodeDef = getNodeDef(numericNodeId, team0.variant || 0);
     if (!nodeDef) return res.status(404).json({ error: "No such node." });
 
+    // Wrong-answer lockout (carried over from v1): a bad guess locks this
+    // node for WRONG_ANSWER_LOCKOUT_SECONDS before the next attempt of any
+    // kind, correct or not — checked before we even look at the answer.
+    const { data: lockout, error: lockoutErr } = await supabase
+        .from("node_lockouts")
+        .select("locked_until")
+        .eq("team_id", teamId)
+        .eq("node_id", numericNodeId)
+        .maybeSingle();
+    if (lockoutErr) {
+        console.error("Lockout lookup failed:", lockoutErr.message);
+        return res.status(500).json({ error: "Couldn't check lockout. Try again." });
+    }
+    if (lockout && new Date(lockout.locked_until) > new Date()) {
+        const secondsLeft = Math.ceil((new Date(lockout.locked_until) - new Date()) / 1000);
+        return res.json({ correct: false, locked: true, secondsLeft });
+    }
+
     if (normalizeAnswer(answer) !== normalizeAnswer(nodeDef.answer)) {
-        return res.json({ correct: false });
+        const lockedUntil = new Date(Date.now() + WRONG_ANSWER_LOCKOUT_SECONDS * 1000).toISOString();
+        const { error: lockErr } = await supabase
+            .from("node_lockouts")
+            .upsert({ team_id: teamId, node_id: numericNodeId, locked_until: lockedUntil });
+        if (lockErr) console.error("Lockout write failed:", lockErr.message);
+        return res.json({ correct: false, locked: false, secondsLeft: WRONG_ANSWER_LOCKOUT_SECONDS });
     }
 
     // Correct — check whether this team already cleared it before awarding
@@ -602,7 +641,7 @@ app.get("/api/team/:teamId/progress", async (req, res) => {
 
     const { data: team, error: teamErr } = await supabase
         .from("teams")
-        .select("intel")
+        .select("intel, vault_reached_at")
         .eq("id", teamId)
         .maybeSingle();
     if (teamErr) {
@@ -620,9 +659,95 @@ app.get("/api/team/:teamId/progress", async (req, res) => {
         return res.status(500).json({ error: "Couldn't load progress." });
     }
 
+    const nodesCleared = (completions || []).map((c) => c.node_id).sort((a, b) => a - b);
+    // Shard codes for every cleared node, keyed by node id — fixed per
+    // node regardless of variant, so this is safe to hand back directly.
+    // Lets a team see (and assemble) their vault code without having to
+    // remember what each node showed them at the time.
+    const shardCodes = {};
+    for (const id of nodesCleared) shardCodes[id] = getShardCode(id);
+
     res.json({
         intel: team.intel,
-        nodesCleared: (completions || []).map((c) => c.node_id),
+        nodesCleared,
+        shardCodes,
+        neededForVault: NEEDED_FOR_VAULT,
+        vaultReached: !!team.vault_reached_at,
+        vaultReachedAt: team.vault_reached_at,
+    });
+});
+
+// ---------------------------------------------------------------------
+// 5c-2. The vault — the actual finish line. A team that has cleared at
+// least NEEDED_FOR_VAULT nodes assembles their shard codes (in ascending
+// node order, no spaces) and submits the combined string here.
+// ---------------------------------------------------------------------
+
+// POST /api/vault/submit { teamId, code }
+app.post("/api/vault/submit", async (req, res) => {
+    const { teamId, code } = req.body || {};
+    if (!teamId || !code) {
+        return res.status(400).json({ error: "teamId and code are required." });
+    }
+
+    const { data: team, error: teamErr } = await supabase
+        .from("teams")
+        .select("vault_reached_at")
+        .eq("id", teamId)
+        .maybeSingle();
+    if (teamErr || !team) {
+        console.error("Vault team lookup failed:", teamErr?.message);
+        return res.status(404).json({ error: "No such team." });
+    }
+
+    const { data: completions, error: compErr } = await supabase
+        .from("node_completions")
+        .select("node_id")
+        .eq("team_id", teamId);
+    if (compErr) {
+        console.error("Vault completions lookup failed:", compErr.message);
+        return res.status(500).json({ error: "Couldn't check progress. Try again." });
+    }
+
+    const clearedIds = (completions || []).map((c) => c.node_id).sort((a, b) => a - b);
+    if (clearedIds.length < NEEDED_FOR_VAULT) {
+        return res.status(400).json({ error: `Clear at least ${NEEDED_FOR_VAULT} nodes before the vault.` });
+    }
+
+    const expected = clearedIds.map((id) => getShardCode(id)).join("");
+    const submitted = String(code).replace(/\s+/g, "").toUpperCase();
+    if (submitted !== expected) {
+        return res.json({ correct: false });
+    }
+
+    if (team.vault_reached_at) {
+        return res.json({ correct: true, alreadyReached: true, reachedAt: team.vault_reached_at });
+    }
+
+    const reachedAt = new Date().toISOString();
+    const { error: updateErr } = await supabase
+        .from("teams")
+        .update({ vault_reached_at: reachedAt })
+        .eq("id", teamId);
+    if (updateErr) {
+        console.error("Vault update failed:", updateErr.message);
+        return res.status(500).json({ error: "Couldn't record vault completion. Try again." });
+    }
+
+    // Arrival rank = how many teams (including this one) reached the vault
+    // at or before this moment — powers the arrival-order scoring bonus.
+    const { count, error: countErr } = await supabase
+        .from("teams")
+        .select("id", { count: "exact", head: true })
+        .not("vault_reached_at", "is", null)
+        .lte("vault_reached_at", reachedAt);
+    if (countErr) console.error("Arrival rank lookup failed:", countErr.message);
+
+    res.json({
+        correct: true,
+        alreadyReached: false,
+        reachedAt,
+        arrivalRank: countErr ? null : count,
     });
 });
 

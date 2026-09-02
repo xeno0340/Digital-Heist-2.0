@@ -301,6 +301,95 @@
         .morse-ref span b {
             color: var(--text);
         }
+
+        .vault {
+            background: var(--surface);
+            border: 1px solid var(--accent-dim);
+            border-radius: 10px;
+            padding: 18px 20px;
+            margin-bottom: 20px;
+        }
+
+        .vault[hidden] {
+            display: none;
+        }
+
+        .vault h2 {
+            font-family: monospace;
+            font-size: 1rem;
+            margin: 0 0 6px;
+            color: var(--accent);
+        }
+
+        .vault p {
+            font-size: .85rem;
+            color: var(--text-dim);
+            margin: 0 0 14px;
+        }
+
+        .vault .row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .vault input {
+            flex: 1;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            padding: 10px 12px;
+            font-family: monospace;
+            font-size: .95rem;
+            letter-spacing: .04em;
+        }
+
+        .vault button {
+            font-family: monospace;
+            padding: 10px 16px;
+            border-radius: 7px;
+            border: 1px solid var(--accent-dim);
+            background: var(--accent);
+            color: #1a1406;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .vault button:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        .vault .feedback {
+            margin-top: 12px;
+            font-size: .85rem;
+            padding: 9px 11px;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .vault .feedback.err {
+            background: rgba(217, 105, 79, .12);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            display: block;
+        }
+
+        .vault .feedback.ok {
+            background: rgba(79, 176, 165, .12);
+            border: 1px solid var(--accent-2);
+            color: var(--accent-2);
+            display: block;
+        }
+
+        .vault.reached {
+            border-color: var(--accent-2-dim);
+        }
+
+        .lockout {
+            color: var(--danger);
+        }
     </style>
 </head>
 
@@ -322,6 +411,17 @@
             <div class="progress-track">
                 <div class="progress-fill" id="progressFill" style="width:0%"></div>
             </div>
+        </div>
+
+        <div class="vault" id="vaultCard" hidden>
+            <h2 id="vaultTitle">THE VAULT</h2>
+            <p id="vaultSub">You've cleared enough nodes. Enter your shard codes in ascending node order, no spaces, to
+                finish.</p>
+            <div class="row">
+                <input id="vaultInput" type="text" autocomplete="off" spellcheck="false" />
+                <button id="vaultSubmitBtn" type="button">Open vault</button>
+            </div>
+            <div class="feedback" id="vaultFeedback"></div>
         </div>
 
         <div class="grid" id="grid"></div>
@@ -370,9 +470,12 @@
             { id: 10, title: "Last Mile", runner: true },
         ];
 
-        const NEEDED_FOR_VAULT = 6;
+        let NEEDED_FOR_VAULT = 6; // overwritten from the server's value once progress loads
         let completedNodes = new Set();
+        let shardCodes = {}; // { [nodeId]: "H1" } for cleared nodes, from the server
+        let vaultReached = false;
         let activeNode = null;
+        let lockoutTimer = null;
         // Populated from the server on load: { [nodeId]: { display, audio } }
         let puzzleText = {};
 
@@ -428,7 +531,80 @@
             const cleared = completedNodes.size;
             progressLabel.textContent = `${cleared} / ${NEEDED_FOR_VAULT} needed for the vault`;
             progressFill.style.width = Math.min(100, (cleared / NEEDED_FOR_VAULT) * 100) + "%";
+            renderVault();
         }
+
+        const vaultCard = document.getElementById("vaultCard");
+        const vaultTitle = document.getElementById("vaultTitle");
+        const vaultSub = document.getElementById("vaultSub");
+        const vaultInput = document.getElementById("vaultInput");
+        const vaultSubmitBtn = document.getElementById("vaultSubmitBtn");
+        const vaultFeedback = document.getElementById("vaultFeedback");
+
+        function assembledCode() {
+            return [...completedNodes]
+                .sort((a, b) => a - b)
+                .map((id) => shardCodes[id] || "")
+                .join("");
+        }
+
+        function renderVault() {
+            if (vaultReached) {
+                vaultCard.hidden = false;
+                vaultCard.classList.add("reached");
+                vaultTitle.textContent = "VAULT OPEN";
+                vaultSub.textContent = "Your team already reached the vault. Nice work.";
+                vaultInput.hidden = true;
+                vaultSubmitBtn.hidden = true;
+                return;
+            }
+            if (completedNodes.size < NEEDED_FOR_VAULT) {
+                vaultCard.hidden = true;
+                return;
+            }
+            vaultCard.hidden = false;
+            vaultCard.classList.remove("reached");
+            vaultInput.hidden = false;
+            vaultSubmitBtn.hidden = false;
+            // Pre-fill with the assembled code so a team isn't hunting through
+            // old submit confirmations for it — still editable, still validated
+            // server-side, so this doesn't skip the actual mechanic.
+            if (document.activeElement !== vaultInput) vaultInput.value = assembledCode();
+        }
+
+        async function submitVault() {
+            const code = vaultInput.value.trim();
+            if (!code) return;
+            vaultSubmitBtn.disabled = true;
+            vaultFeedback.className = "feedback";
+            try {
+                const res = await fetch(API_BASE + "/api/vault/submit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ teamId, code }),
+                });
+                const data = await res.json();
+                if (data.correct) {
+                    vaultReached = true;
+                    vaultFeedback.textContent = data.alreadyReached
+                        ? "Already opened."
+                        : `Vault opened! Arrival order: #${data.arrivalRank ?? "?"}.`;
+                    vaultFeedback.className = "feedback ok";
+                    renderVault();
+                } else {
+                    vaultFeedback.textContent = data.error || "That's not it — check your shard codes and try again.";
+                    vaultFeedback.className = "feedback err";
+                }
+            } catch (e) {
+                vaultFeedback.textContent = "Couldn't reach the server — try again.";
+                vaultFeedback.className = "feedback err";
+            } finally {
+                vaultSubmitBtn.disabled = false;
+            }
+        }
+
+        vaultSubmitBtn.addEventListener("click", submitVault);
+        vaultInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitVault(); });
 
         function openModal(node) {
             activeNode = node;
@@ -445,6 +621,8 @@
                 modalAudio.hidden = true;
                 morseRef.hidden = true;
             }
+            clearInterval(lockoutTimer);
+            submitAnswerBtn.disabled = false;
             answerInput.value = "";
             feedback.className = "feedback";
             overlay.classList.add("open");
@@ -454,11 +632,32 @@
         function closeModal() {
             overlay.classList.remove("open");
             modalAudio.pause();
+            clearInterval(lockoutTimer);
             activeNode = null;
         }
 
         document.getElementById("cancelBtn").addEventListener("click", closeModal);
         overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+
+        const submitAnswerBtn = document.getElementById("submitAnswerBtn");
+
+        function startLockoutCountdown(seconds) {
+            clearInterval(lockoutTimer);
+            let remaining = seconds;
+            submitAnswerBtn.disabled = true;
+            const tick = () => {
+                feedback.textContent = `Locked out — try again in ${remaining}s.`;
+                feedback.className = "feedback err lockout";
+                if (remaining <= 0) {
+                    clearInterval(lockoutTimer);
+                    submitAnswerBtn.disabled = false;
+                    feedback.className = "feedback";
+                }
+                remaining -= 1;
+            };
+            tick();
+            lockoutTimer = setInterval(tick, 1000);
+        }
 
         async function submitAnswer() {
             if (!activeNode) return;
@@ -474,20 +673,26 @@
 
             if (data.correct) {
                 completedNodes.add(activeNode.id);
+                shardCodes[activeNode.id] = data.shardCode;
                 renderGrid();
                 feedback.textContent = data.alreadyCompleted
                     ? "Already cleared — shard code: " + data.shardCode
                     : `Correct! Shard code ${data.shardCode}, +${data.intelAwarded} Intel.`;
                 feedback.className = "feedback ok";
                 if (!data.alreadyCompleted) updateProgressUI(data.totalIntel);
+                else renderVault();
                 setTimeout(closeModal, 1400);
+            } else if (data.secondsLeft) {
+                // Wrong guess (or already-locked node) — start/refresh the
+                // per-node lockout countdown instead of letting the team spam it.
+                startLockoutCountdown(data.secondsLeft);
             } else {
                 feedback.textContent = "Not quite — try again.";
                 feedback.className = "feedback err";
             }
         }
 
-        document.getElementById("submitAnswerBtn").addEventListener("click", submitAnswer);
+        submitAnswerBtn.addEventListener("click", submitAnswer);
         answerInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitAnswer(); });
 
         document.getElementById("logoutBtn").addEventListener("click", () => {
@@ -501,6 +706,9 @@
                 const res = await fetch(API_BASE + "/api/team/" + teamId + "/progress");
                 const data = await res.json();
                 completedNodes = new Set(data.nodesCleared || []);
+                shardCodes = data.shardCodes || {};
+                vaultReached = !!data.vaultReached;
+                if (data.neededForVault) NEEDED_FOR_VAULT = data.neededForVault;
                 renderGrid();
                 updateProgressUI(data.intel || 0);
             } catch (e) {
