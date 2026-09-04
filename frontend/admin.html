@@ -1,0 +1,1174 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Digital Heist 2.0 — Admin</title>
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="theme.css" />
+    <style>
+        /* Colors, fonts, radii and .card/.btn/.field/.banner all come from
+     theme.css — the same design tokens as map.html/login.html/leaderboard.html
+     — so the admin panel matches the player-facing pages instead of
+     carrying its own separate palette. Everything below is admin-specific
+     layout and a couple of component variants theme.css doesn't define
+     (data tables, status badges, expandable rows). */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: var(--font-ui);
+            padding: 24px;
+        }
+
+        .wrap {
+            max-width: 760px;
+            margin: 0 auto;
+        }
+
+        .wrap.wide {
+            max-width: 1180px;
+        }
+
+        h1 {
+            font-family: var(--font-mono);
+            font-size: 1.2rem;
+            margin: 0 0 4px;
+        }
+
+        h2 {
+            font-family: var(--font-mono);
+            font-size: .95rem;
+            margin: 0 0 4px;
+        }
+
+        .sub {
+            color: var(--text-dim);
+            font-size: .88rem;
+            margin: 0 0 24px;
+        }
+
+        .card {
+            padding: 22px;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: .82rem;
+            color: var(--text-dim);
+            margin: 0 0 6px;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            background: color-mix(in srgb, var(--bg) 92%, var(--surface-2));
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            padding: 10px 12px;
+            font-size: .92rem;
+            font-family: inherit;
+        }
+
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+        }
+
+        textarea {
+            min-height: 160px;
+            font-family: var(--font-mono);
+            resize: vertical;
+        }
+
+        .row {
+            margin-bottom: 16px;
+        }
+
+        .inline {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .inline>div {
+            flex: 1;
+        }
+
+        button {
+            font-family: var(--font-mono);
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid transparent;
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: var(--accent-ink);
+            font-weight: 700;
+            cursor: pointer;
+            font-size: .88rem;
+            box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 35%, transparent);
+            transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease, background .15s ease;
+        }
+
+        button:hover {
+            filter: brightness(1.04);
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0) scale(.98);
+        }
+
+        button:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        button.secondary {
+            background: var(--surface-2);
+            color: var(--text);
+            border-color: var(--border);
+            font-weight: 600;
+            box-shadow: none;
+        }
+
+        button.secondary:hover {
+            border-color: var(--accent-dim);
+        }
+
+        button.danger {
+            background: var(--danger);
+            border-color: var(--danger-dim);
+            color: #fff;
+            box-shadow: none;
+        }
+
+        button.small {
+            padding: 6px 10px;
+            font-size: .76rem;
+        }
+
+        .msg {
+            margin-top: 14px;
+            font-size: .85rem;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            display: none;
+            font-family: var(--font-mono);
+        }
+
+        .msg.error {
+            background: color-mix(in srgb, var(--danger) 14%, transparent);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            display: block;
+        }
+
+        .msg.ok {
+            background: color-mix(in srgb, var(--accent) 14%, transparent);
+            border: 1px solid var(--accent-dim);
+            color: var(--accent-strong);
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: .88rem;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            color: var(--text-dim);
+            font-family: var(--font-mono);
+            font-size: .78rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        td.pin {
+            font-family: var(--font-mono);
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        td.err {
+            color: var(--danger);
+        }
+
+        td.num {
+            font-family: var(--font-mono);
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .row-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .hint {
+            color: var(--text-faint);
+            font-size: .78rem;
+            margin-top: 6px;
+        }
+
+        .nav {
+            margin: 0 0 20px;
+            font-family: var(--font-mono);
+            font-size: .82rem;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .nav a {
+            color: var(--text-dim);
+            text-decoration: underline;
+        }
+
+        .nav .spacer {
+            flex: 1;
+        }
+
+        .fact-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .fact-row:last-child {
+            border-bottom: none;
+        }
+
+        .fact-row .q {
+            font-weight: 600;
+            font-size: .88rem;
+            margin: 0 0 3px;
+        }
+
+        .fact-row .a {
+            color: var(--accent);
+            font-family: var(--font-mono);
+            font-size: .85rem;
+            margin: 0;
+        }
+
+        .fact-row .kw {
+            color: var(--text-faint);
+            font-size: .75rem;
+            margin: 3px 0 0;
+        }
+
+        .fact-row button {
+            padding: 6px 10px;
+            font-size: .76rem;
+            background: var(--surface-2);
+            color: var(--danger);
+            border-color: var(--border);
+            box-shadow: none;
+        }
+
+        .badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: .7rem;
+            letter-spacing: .04em;
+            padding: 3px 8px;
+            border-radius: 999px;
+            text-transform: uppercase;
+        }
+
+        .badge.ok {
+            background: color-mix(in srgb, var(--accent) 14%, transparent);
+            color: var(--accent-strong);
+        }
+
+        .badge.blocked {
+            background: color-mix(in srgb, var(--danger) 16%, transparent);
+            color: var(--danger);
+        }
+
+        .badge.vault {
+            background: color-mix(in srgb, var(--warn) 16%, transparent);
+            color: var(--warn);
+        }
+
+        .badge.rank1 {
+            background: color-mix(in srgb, var(--warn) 20%, transparent);
+            color: var(--warn);
+        }
+
+        tr.detail-row {
+            display: none;
+        }
+
+        tr.detail-row.open {
+            display: table-row;
+        }
+
+        tr.detail-row td {
+            background: var(--surface-2);
+            padding: 14px 10px;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+            font-size: .82rem;
+        }
+
+        .detail-grid .label {
+            color: var(--text-faint);
+            font-size: .7rem;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            margin: 0 0 4px;
+        }
+
+        .detail-grid .val {
+            color: var(--text);
+        }
+
+        .member-line {
+            margin: 0 0 2px;
+        }
+
+        .roster-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 2px;
+        }
+
+        .roster-toolbar .spacer {
+            flex: 1;
+        }
+
+        .roster-empty {
+            color: var(--text-faint);
+            font-size: .85rem;
+            padding: 14px 0;
+        }
+
+        tr.lb-rank1 td:first-child,
+        tr.lb-rank1 td.lb-rank {
+            color: var(--warn);
+            font-weight: 700;
+        }
+
+        /* ================= Login screen ================= */
+        #loginScreen {
+            min-height: calc(100vh - 48px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #loginScreen .login-card {
+            max-width: 380px;
+            width: 100%;
+        }
+
+        #loginScreen h1 {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+
+        #loginScreen .sub {
+            margin-bottom: 20px;
+        }
+
+        #dashboard[hidden],
+        #loginScreen[hidden] {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="wrap" id="loginScreen">
+        <div class="card login-card">
+            <h1>DIGITAL HEIST 2.0 — ADMIN</h1>
+            <p class="sub">Enter the admin secret to open the dashboard. This is the same value as ADMIN_SECRET in your
+                backend's .env — not a username/password.</p>
+            <div class="row">
+                <label for="loginSecret">Admin secret</label>
+                <input id="loginSecret" type="password" autocomplete="off"
+                    placeholder="Paste the ADMIN_SECRET from your .env" />
+            </div>
+            <div class="actions">
+                <button id="loginBtn" type="button" style="width:100%;">Unlock dashboard</button>
+            </div>
+            <div class="msg" id="loginMsg"></div>
+            <p class="hint">Stays unlocked in this browser tab until you close it or hit "Lock dashboard" — never saved
+                to disk, never sent anywhere except as a header on requests to this backend.</p>
+        </div>
+    </div>
+
+    <div class="wrap wide" id="dashboard" hidden>
+        <div class="nav">
+            <a href="leaderboard.html">Public leaderboard</a>
+            <a href="login.html">Team login</a>
+            <span class="spacer"></span>
+            <button class="theme-toggle" type="button" aria-label="Toggle theme">
+                <span class="seg" data-seg="dark">Dark</span>
+                <span class="seg" data-seg="light">Light</span>
+            </button>
+            <button id="lockDashboardBtn" class="secondary small" type="button">Lock dashboard</button>
+        </div>
+        <h1>DIGITAL HEIST 2.0 — ADMIN</h1>
+        <p class="sub">Bulk-create team accounts, run the event clock, moderate teams live, and edit Reference Console
+            content.</p>
+
+        <div class="card">
+            <div class="row">
+                <label for="names">Team names (one per line)</label>
+                <textarea id="names" placeholder="Team Alpha&#10;Team Bravo&#10;Team Charlie"></textarea>
+            </div>
+            <div class="inline row">
+                <div>
+                    <label for="pinDigits">PIN length</label>
+                    <input id="pinDigits" type="number" min="4" max="6" value="4" />
+                </div>
+                <div style="flex:2"></div>
+            </div>
+            <div class="actions">
+                <button id="createBtn">Create teams</button>
+            </div>
+            <div class="msg" id="msg"></div>
+        </div>
+
+        <div class="card" id="resultsCard" style="display:none;">
+            <h2>Credentials — save or print this now</h2>
+            <p class="hint">PINs are shown once and are never stored in plaintext or retrievable again.</p>
+            <table id="resultsTable">
+                <thead>
+                    <tr>
+                        <th>Team</th>
+                        <th>PIN</th>
+                        <th>Variant</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+            <div class="actions">
+                <button id="downloadBtn" type="button">Download CSV</button>
+                <button id="printBtn" class="secondary" type="button">Print</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Game controls</h2>
+            <p class="hint">Sabotage stays off until you start the game, plus an 8-minute safe window after that. It
+                then stays live for the whole event — a team that reaches the vault just can't be targeted anymore
+                (their rank's locked in), though they can still spend Intel attacking teams still racing.</p>
+            <div class="actions">
+                <button id="startGameBtn" type="button">Start game</button>
+                <button id="suspendBtn" class="secondary" type="button">Stop sabotage</button>
+                <button id="resumeBtn" class="secondary" type="button">Resume sabotage</button>
+            </div>
+            <div class="msg" id="gameMsg"></div>
+        </div>
+
+        <div class="card">
+            <div class="roster-toolbar">
+                <h2 style="margin:0;">Live leaderboard</h2>
+                <span class="spacer"></span>
+                <button id="refreshLeaderboardBtn" class="secondary small" type="button">Refresh</button>
+            </div>
+            <p class="hint">Ranked by nodes cleared first (most wins) — ties broken by elapsed time (fastest wins). This
+                is the "who's actually ahead right now" view; the public leaderboard page ranks by score instead.
+                Refreshes with the roster every 15s.</p>
+            <div style="overflow-x:auto;">
+                <table id="lbTable">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Team</th>
+                            <th>Nodes</th>
+                            <th>Time</th>
+                            <th>Vault</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lbBody"></tbody>
+                </table>
+                <div id="lbEmpty" class="roster-empty" style="display:none;">No teams created yet.</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Teams needing attention</h2>
+            <p class="hint">A station locks itself the moment a team leaves fullscreen or switches tabs/apps mid-game —
+                this is a heuristic, not proof of cheating (an OS notification or a legitimate alt-tab can trigger it
+                too). You can also block a team yourself for any reason from the roster below. Either way, a blocked
+                team can't submit answers, reach the vault, or use sabotage until you unblock them here. Refreshes
+                automatically every 15s.</p>
+            <div id="attentionList" class="roster-empty">Loading…</div>
+            <div class="msg" id="attentionMsg"></div>
+        </div>
+
+        <div class="card">
+            <div class="roster-toolbar">
+                <h2 style="margin:0;">Team roster</h2>
+                <span class="spacer"></span>
+                <button id="refreshRosterBtn" class="secondary small" type="button">Refresh</button>
+            </div>
+            <p class="hint">Nodes cleared, live score, vault status, and elapsed time since you hit Start game. Click a
+                team name for full detail (team members, lead contact, exact nodes cleared). Refreshes automatically
+                every 15s.</p>
+            <div style="overflow-x:auto;">
+                <table id="rosterTable">
+                    <thead>
+                        <tr>
+                            <th>Team</th>
+                            <th>Score</th>
+                            <th>Intel</th>
+                            <th>Nodes</th>
+                            <th>Vault</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rosterBody"></tbody>
+                </table>
+                <div id="rosterEmpty" class="roster-empty" style="display:none;">No teams created yet.</div>
+            </div>
+            <div class="msg" id="rosterMsg"></div>
+        </div>
+
+        <div class="card">
+            <h2>Reference Console content</h2>
+            <p class="hint">Facts teams can look up during the event without their phones (see the Reference Console tab
+                on the map page). This is a curated list you control — nothing here is fetched from the open internet.
+            </p>
+            <div class="inline row">
+                <div>
+                    <label for="factKeywords">Search keywords (comma-separated)</label>
+                    <input id="factKeywords" type="text" placeholder="titanic, rms titanic, titanic sinking" />
+                </div>
+            </div>
+            <div class="row">
+                <label for="factQuestion">Question</label>
+                <input id="factQuestion" type="text" placeholder="When did the Titanic sink?" />
+            </div>
+            <div class="row">
+                <label for="factAnswer">Answer</label>
+                <input id="factAnswer" type="text" placeholder="15 April 1912" />
+            </div>
+            <div class="actions">
+                <button id="addFactBtn" type="button">Add fact</button>
+                <button id="loadFactsBtn" class="secondary" type="button">Refresh list</button>
+            </div>
+            <div class="msg" id="factMsg"></div>
+            <div id="factsList" style="margin-top:16px;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "";
+        const SECRET_STORAGE_KEY = "dh_admin_secret";
+
+        // ===========================================================================
+        // Login gate. There's no username/password here — the whole "account" is
+        // knowing ADMIN_SECRET, so this screen just checks it against the backend
+        // (every /api/admin/* route already 401s on a wrong one via requireAdmin)
+        // and, on success, reuses that same request's data as the dashboard's
+        // first roster load instead of re-fetching. sessionStorage (not
+        // localStorage) so it survives a reload/tab-crash during the event but
+        // clears itself the moment this browser tab actually closes.
+        // ===========================================================================
+        const loginScreen = document.getElementById("loginScreen");
+        const dashboard = document.getElementById("dashboard");
+        const loginSecretEl = document.getElementById("loginSecret");
+        const loginBtn = document.getElementById("loginBtn");
+        const loginMsg = document.getElementById("loginMsg");
+        const lockDashboardBtn = document.getElementById("lockDashboardBtn");
+
+        let adminSecret = null;
+        let pollTimers = [];
+
+        function showLoginMsg(text, ok) {
+            loginMsg.textContent = text;
+            loginMsg.className = "msg " + (ok ? "ok" : "error");
+        }
+
+        function startDashboard(secret, firstLoadData) {
+            adminSecret = secret;
+            sessionStorage.setItem(SECRET_STORAGE_KEY, secret);
+            loginScreen.hidden = true;
+            dashboard.hidden = false;
+            if (firstLoadData) renderRoster(firstLoadData);
+            loadFacts();
+            pollTimers.push(setInterval(refreshRoster, 15000));
+        }
+
+        function lockDashboard() {
+            adminSecret = null;
+            sessionStorage.removeItem(SECRET_STORAGE_KEY);
+            pollTimers.forEach(clearInterval);
+            pollTimers = [];
+            dashboard.hidden = true;
+            loginScreen.hidden = false;
+            loginSecretEl.value = "";
+            loginMsg.className = "msg";
+        }
+        lockDashboardBtn.addEventListener("click", lockDashboard);
+
+        async function attemptLogin(secret, { silent } = {}) {
+            if (!secret) {
+                if (!silent) showLoginMsg("Enter the admin secret.", false);
+                return;
+            }
+            loginBtn.disabled = true;
+            try {
+                const res = await fetch(API_BASE + "/api/admin/teams", { headers: { "x-admin-secret": secret } });
+                if (res.status === 401) {
+                    sessionStorage.removeItem(SECRET_STORAGE_KEY);
+                    if (!silent) showLoginMsg("Incorrect secret.", false);
+                    return;
+                }
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Request failed.");
+                startDashboard(secret, data);
+            } catch (err) {
+                if (!silent) showLoginMsg(err.message || "Couldn't reach the server.", false);
+            } finally {
+                loginBtn.disabled = false;
+            }
+        }
+
+        loginBtn.addEventListener("click", () => attemptLogin(loginSecretEl.value.trim()));
+        loginSecretEl.addEventListener("keydown", (e) => { if (e.key === "Enter") attemptLogin(loginSecretEl.value.trim()); });
+
+        // A saved secret from earlier in this tab's life gets tried silently —
+        // if it's gone stale (e.g. ADMIN_SECRET was rotated) this just falls
+        // back to the empty login screen with no error shown, no worse than a
+        // fresh visit.
+        const savedSecret = sessionStorage.getItem(SECRET_STORAGE_KEY);
+        if (savedSecret) attemptLogin(savedSecret, { silent: true });
+
+        // Every authenticated call below assumes attemptLogin already succeeded
+        // (adminSecret is set) — none of this runs until the dashboard is showing.
+        async function adminFetch(path, options = {}) {
+            const res = await fetch(API_BASE + path, {
+                ...options,
+                headers: { ...(options.headers || {}), "x-admin-secret": adminSecret },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.status === 401) {
+                // The secret stopped working mid-session (rotated, or never really
+                // matched) — don't keep silently failing every poll, drop back to
+                // the login screen so it's obvious why nothing's updating.
+                lockDashboard();
+                throw new Error("Session no longer authorized — log in again.");
+            }
+            if (!res.ok) throw new Error(data.error || "Request failed.");
+            return data;
+        }
+
+        // ===========================================================================
+        // Create teams + one-time PIN reveal
+        // ===========================================================================
+        const namesEl = document.getElementById("names");
+        const pinDigitsEl = document.getElementById("pinDigits");
+        const msgEl = document.getElementById("msg");
+        const createBtn = document.getElementById("createBtn");
+        const resultsCard = document.getElementById("resultsCard");
+        const resultsBody = document.getElementById("resultsBody");
+        const downloadBtn = document.getElementById("downloadBtn");
+        const printBtn = document.getElementById("printBtn");
+
+        let lastCsvRows = [];
+
+        function showMsg(text, ok) {
+            msgEl.textContent = text;
+            msgEl.className = "msg " + (ok ? "ok" : "error");
+        }
+
+        function renderResults(rows) {
+            resultsBody.innerHTML = "";
+            lastCsvRows = [];
+            for (const r of rows) {
+                const tr = document.createElement("tr");
+                if (r.ok) {
+                    tr.innerHTML = `<td>${escapeHtml(r.teamName)}</td><td class="pin">${escapeHtml(r.pin)}</td><td>${r.variant}</td>`;
+                    lastCsvRows.push([r.teamName, r.pin, r.variant]);
+                } else {
+                    tr.innerHTML = `<td>${escapeHtml(r.teamName)}</td><td class="err">${escapeHtml(r.error || "Failed")}</td><td></td>`;
+                }
+                resultsBody.appendChild(tr);
+            }
+            resultsCard.style.display = rows.length ? "block" : "none";
+        }
+
+        createBtn.addEventListener("click", async () => {
+            const teamNames = namesEl.value.split("\n").map((s) => s.trim()).filter(Boolean);
+            const pinDigits = Number(pinDigitsEl.value) || 4;
+            if (!teamNames.length) return showMsg("Enter at least one team name.", false);
+
+            createBtn.disabled = true;
+            msgEl.className = "msg";
+            try {
+                const data = await adminFetch("/api/admin/teams", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ teamNames, pinDigits }),
+                });
+                const failed = data.results.filter((r) => !r.ok).length;
+                const created = data.results.length - failed;
+                showMsg(
+                    failed
+                        ? `Created ${created} team(s), ${failed} failed (likely duplicate names) — see table below.`
+                        : `Created ${created} team(s). Save these PINs now.`,
+                    failed === 0
+                );
+                renderResults(data.results);
+                namesEl.value = "";
+                refreshRoster();
+            } catch (err) {
+                showMsg(err.message, false);
+            } finally {
+                createBtn.disabled = false;
+            }
+        });
+
+        downloadBtn.addEventListener("click", () => {
+            if (!lastCsvRows.length) return;
+            const csv = ["team_name,pin,variant", ...lastCsvRows.map((r) => `"${r[0].replace(/"/g, '""')}",${r[1]},${r[2]}`)].join("\n");
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "digital-heist-teams.csv";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        });
+
+        printBtn.addEventListener("click", () => window.print());
+
+        function escapeHtml(s) {
+            return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        }
+
+        // ===========================================================================
+        // Game controls
+        // ===========================================================================
+        const startGameBtn = document.getElementById("startGameBtn");
+        const suspendBtn = document.getElementById("suspendBtn");
+        const resumeBtn = document.getElementById("resumeBtn");
+        const gameMsg = document.getElementById("gameMsg");
+
+        function showGameMsg(text, ok) {
+            gameMsg.textContent = text;
+            gameMsg.className = "msg " + (ok ? "ok" : "error");
+        }
+
+        startGameBtn.addEventListener("click", async () => {
+            startGameBtn.disabled = true;
+            try {
+                await adminFetch("/api/admin/game/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+                showGameMsg("Game started — sabotage unlocks in 8 minutes.", true);
+                refreshRoster();
+            } catch (err) {
+                showGameMsg(err.message, false);
+            } finally {
+                startGameBtn.disabled = false;
+            }
+        });
+
+        suspendBtn.addEventListener("click", async () => {
+            suspendBtn.disabled = true;
+            try {
+                await adminFetch("/api/admin/game/suspend-sabotage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ suspended: true }) });
+                showGameMsg("Sabotage stopped room-wide.", true);
+            } catch (err) {
+                showGameMsg(err.message, false);
+            } finally {
+                suspendBtn.disabled = false;
+            }
+        });
+
+        resumeBtn.addEventListener("click", async () => {
+            resumeBtn.disabled = true;
+            try {
+                await adminFetch("/api/admin/game/suspend-sabotage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ suspended: false }) });
+                showGameMsg("Sabotage resumed.", true);
+            } catch (err) {
+                showGameMsg(err.message, false);
+            } finally {
+                resumeBtn.disabled = false;
+            }
+        });
+
+        // ===========================================================================
+        // Team roster + "needs attention" — one shared poll (GET /api/admin/teams)
+        // feeds both the compact blocked-teams list (for a quick scan mid-event)
+        // and the full detail table below it.
+        // ===========================================================================
+        const attentionList = document.getElementById("attentionList");
+        const attentionMsg = document.getElementById("attentionMsg");
+        const rosterBody = document.getElementById("rosterBody");
+        const rosterEmpty = document.getElementById("rosterEmpty");
+        const rosterMsg = document.getElementById("rosterMsg");
+        const refreshRosterBtn = document.getElementById("refreshRosterBtn");
+
+        let rosterBusy = false;
+        let openDetailIds = new Set(); // which rows are expanded, preserved across refreshes
+
+        function showAttentionMsg(text, ok) {
+            attentionMsg.textContent = text;
+            attentionMsg.className = "msg " + (ok ? "ok" : "error");
+        }
+        function showRosterMsg(text, ok) {
+            rosterMsg.textContent = text;
+            rosterMsg.className = "msg " + (ok ? "ok" : "error");
+        }
+
+        function timeAgo(iso) {
+            if (!iso) return "";
+            const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+            if (s < 60) return s + "s ago";
+            if (s < 3600) return Math.round(s / 60) + "m ago";
+            return Math.round(s / 3600) + "h ago";
+        }
+
+        function formatDuration(seconds) {
+            if (seconds == null) return "—";
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
+            if (m > 0) return `${m}m ${String(s).padStart(2, "0")}s`;
+            return `${s}s`;
+        }
+
+        async function refreshRoster() {
+            if (rosterBusy) return;
+            rosterBusy = true;
+            try {
+                const data = await adminFetch("/api/admin/teams");
+                renderRoster(data);
+            } catch (err) {
+                showRosterMsg(err.message, false);
+            } finally {
+                rosterBusy = false;
+            }
+        }
+        refreshRosterBtn.addEventListener("click", refreshRoster);
+
+        function renderRoster(data) {
+            const teams = data.teams || [];
+            renderLeaderboard(teams);
+            renderAttention(teams);
+            renderRosterTable(teams);
+        }
+
+        // ===========================================================================
+        // Live leaderboard — ranked by nodes cleared (desc), then elapsed time
+        // (asc, i.e. faster wins) as the tiebreaker. Deliberately a different
+        // sort from the public leaderboard.html page, which ranks by score
+        // (banked Intel + node bonus + arrival bonus) — this view answers "who
+        // has actually solved the most, right now," which score alone can hide
+        // (a team could out-score another purely by sitting on banked Intel).
+        // A team with no elapsed time yet (game not started) sorts last within
+        // its node-count tier rather than winning ties by default.
+        // ===========================================================================
+        const lbBody = document.getElementById("lbBody");
+        const lbEmpty = document.getElementById("lbEmpty");
+        const refreshLeaderboardBtn = document.getElementById("refreshLeaderboardBtn");
+        refreshLeaderboardBtn.addEventListener("click", refreshRoster);
+
+        function renderLeaderboard(teams) {
+            const ranked = teams.slice().sort((a, b) => {
+                if (b.nodesClearedCount !== a.nodesClearedCount) return b.nodesClearedCount - a.nodesClearedCount;
+                const at = a.elapsedSeconds == null ? Infinity : a.elapsedSeconds;
+                const bt = b.elapsedSeconds == null ? Infinity : b.elapsedSeconds;
+                if (at !== bt) return at - bt;
+                return a.teamName.localeCompare(b.teamName);
+            });
+
+            lbEmpty.style.display = ranked.length ? "none" : "block";
+            lbBody.innerHTML = ranked.map((t, i) => {
+                const rank = i + 1;
+                const vaultBadge = t.vaultReached
+                    ? `<span class="badge vault">#${t.arrivalRank ?? "?"}</span>`
+                    : `<span class="hint">—</span>`;
+                return `
+        <tr class="${rank === 1 && t.nodesClearedCount > 0 ? "lb-rank1" : ""}">
+          <td class="num lb-rank">${rank}</td>
+          <td>${escapeHtml(t.teamName)}</td>
+          <td class="num">${t.nodesClearedCount}/10</td>
+          <td class="num">${formatDuration(t.elapsedSeconds)}</td>
+          <td>${vaultBadge}</td>
+          <td class="num">${t.score}</td>
+        </tr>`;
+            }).join("");
+        }
+
+        function renderAttention(teams) {
+            const flagged = teams.filter((t) => t.integrityLocked);
+            if (!flagged.length) {
+                attentionList.className = "roster-empty";
+                attentionList.textContent = "No teams currently blocked.";
+                return;
+            }
+            attentionList.className = "";
+            attentionList.innerHTML = "";
+            for (const t of flagged) {
+                const row = document.createElement("div");
+                row.className = "fact-row";
+                row.innerHTML = `
+        <div>
+          <p class="q" style="color:var(--danger);">${escapeHtml(t.teamName)}</p>
+          <p class="a" style="color:var(--text-dim);">${escapeHtml(t.integrityLockReason || "no reason reported")}</p>
+          <p class="kw">${timeAgo(t.integrityLockedAt)}</p>
+        </div>
+        <button type="button">Unblock</button>
+      `;
+                row.querySelector("button").addEventListener("click", (e) => unlockTeam(t.id, e.target));
+                attentionList.appendChild(row);
+            }
+        }
+
+        function vaultCellHtml(t) {
+            if (t.vaultReached) return `<span class="badge vault">#${t.arrivalRank ?? "?"}</span>`;
+            if (t.elapsedSeconds == null) return `<span class="hint">not started</span>`;
+            return `<span class="hint">racing</span>`;
+        }
+        function statusCellHtml(t) {
+            return t.integrityLocked
+                ? `<span class="badge blocked" title="${escapeHtml(t.integrityLockReason || "")}">Blocked</span>`
+                : `<span class="badge ok">OK</span>`;
+        }
+
+        function renderRosterTable(teams) {
+            rosterBody.innerHTML = "";
+            rosterEmpty.style.display = teams.length ? "none" : "block";
+
+            for (const t of teams) {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+        <td><a href="#" class="detail-toggle" style="color:var(--text);text-decoration:none;font-weight:600;">${escapeHtml(t.teamName)}</a></td>
+        <td class="num">${t.score}</td>
+        <td class="num">${t.intel}</td>
+        <td class="num">${t.nodesClearedCount}/10 <span class="hint">(${t.neededForVault} for vault)</span></td>
+        <td>${vaultCellHtml(t)}</td>
+        <td class="num">${formatDuration(t.elapsedSeconds)}</td>
+        <td>${statusCellHtml(t)}</td>
+        <td class="row-actions">
+          <button type="button" class="secondary small" data-action="block">${t.integrityLocked ? "Unblock" : "Block"}</button>
+          <button type="button" class="danger small" data-action="delete">Delete</button>
+        </td>
+      `;
+                tr.querySelector(".detail-toggle").addEventListener("click", (e) => { e.preventDefault(); toggleDetail(t.id); });
+                tr.querySelector('[data-action="block"]').addEventListener("click", (e) => {
+                    if (t.integrityLocked) unlockTeam(t.id, e.target);
+                    else blockTeam(t.id, e.target);
+                });
+                tr.querySelector('[data-action="delete"]').addEventListener("click", (e) => deleteTeam(t.id, t.teamName, e.target));
+                rosterBody.appendChild(tr);
+
+                const detailTr = document.createElement("tr");
+                detailTr.className = "detail-row" + (openDetailIds.has(t.id) ? " open" : "");
+                detailTr.dataset.detailFor = t.id;
+                const p = t.profile;
+                const memberLines = p && p.members && p.members.length
+                    ? p.members.map((m) => `<p class="member-line">${escapeHtml(m.name)} — ${escapeHtml(m.roll)}</p>`).join("")
+                    : `<p class="hint">No profile submitted yet.</p>`;
+                detailTr.innerHTML = `
+        <td colspan="8">
+          <div class="detail-grid">
+            <div>
+              <p class="label">Nodes cleared</p>
+              <p class="val">${t.nodesCleared.length ? t.nodesCleared.join(", ") : "none yet"}</p>
+            </div>
+            <div>
+              <p class="label">Team members</p>
+              <div class="val">${memberLines}</div>
+            </div>
+            <div>
+              <p class="label">Lead contact</p>
+              <p class="val">${p ? escapeHtml(p.leadEmail || "—") : "—"}<br>${p ? escapeHtml(p.leadPhone || "—") : "—"}</p>
+            </div>
+            <div>
+              <p class="label">Variant / created</p>
+              <p class="val">Variant ${t.variant} · ${new Date(t.createdAt).toLocaleString()}</p>
+            </div>
+            ${t.integrityLocked ? `<div>
+              <p class="label">Block reason</p>
+              <p class="val">${escapeHtml(t.integrityLockReason || "unspecified")} (${timeAgo(t.integrityLockedAt)})</p>
+            </div>` : ""}
+          </div>
+        </td>
+      `;
+                rosterBody.appendChild(detailTr);
+            }
+        }
+
+        function toggleDetail(teamId) {
+            if (openDetailIds.has(teamId)) openDetailIds.delete(teamId);
+            else openDetailIds.add(teamId);
+            const row = rosterBody.querySelector(`tr.detail-row[data-detail-for="${teamId}"]`);
+            if (row) row.classList.toggle("open", openDetailIds.has(teamId));
+        }
+
+        async function unlockTeam(teamId, btn) {
+            btn.disabled = true;
+            try {
+                await adminFetch("/api/admin/teams/" + teamId + "/unlock", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+                showAttentionMsg("Team unblocked.", true);
+                refreshRoster();
+            } catch (err) {
+                btn.disabled = false;
+                showAttentionMsg("Couldn't unblock: " + err.message, false);
+            }
+        }
+
+        async function blockTeam(teamId, btn) {
+            btn.disabled = true;
+            try {
+                await adminFetch("/api/admin/teams/" + teamId + "/block", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ reason: "blocked by admin" }),
+                });
+                showRosterMsg("Team blocked.", true);
+                refreshRoster();
+            } catch (err) {
+                btn.disabled = false;
+                showRosterMsg("Couldn't block: " + err.message, false);
+            }
+        }
+
+        async function deleteTeam(teamId, teamName, btn) {
+            if (!confirm(`Permanently delete "${teamName}"? This removes their progress, PIN, and profile. This can't be undone.`)) return;
+            btn.disabled = true;
+            try {
+                await adminFetch("/api/admin/teams/" + teamId, { method: "DELETE" });
+                openDetailIds.delete(teamId);
+                showRosterMsg(`"${teamName}" deleted.`, true);
+                refreshRoster();
+            } catch (err) {
+                btn.disabled = false;
+                showRosterMsg("Couldn't delete: " + err.message, false);
+            }
+        }
+
+        // ===========================================================================
+        // Reference Console content editor.
+        // ===========================================================================
+        const factKeywordsEl = document.getElementById("factKeywords");
+        const factQuestionEl = document.getElementById("factQuestion");
+        const factAnswerEl = document.getElementById("factAnswer");
+        const addFactBtn = document.getElementById("addFactBtn");
+        const loadFactsBtn = document.getElementById("loadFactsBtn");
+        const factMsg = document.getElementById("factMsg");
+        const factsList = document.getElementById("factsList");
+
+        function showFactMsg(text, ok) {
+            factMsg.textContent = text;
+            factMsg.className = "msg " + (ok ? "ok" : "error");
+        }
+
+        function renderFacts(facts) {
+            factsList.innerHTML = "";
+            if (!facts.length) {
+                factsList.innerHTML = '<p class="hint">No facts added yet.</p>';
+                return;
+            }
+            for (const f of facts) {
+                const row = document.createElement("div");
+                row.className = "fact-row";
+                row.innerHTML = `
+        <div>
+          <p class="q">${escapeHtml(f.question)}</p>
+          <p class="a">${escapeHtml(f.answer)}</p>
+          <p class="kw">${escapeHtml(f.keywords)}</p>
+        </div>
+        <button type="button">Delete</button>
+      `;
+                row.querySelector("button").addEventListener("click", () => deleteFact(f.id));
+                factsList.appendChild(row);
+            }
+        }
+
+        async function loadFacts() {
+            try {
+                const data = await adminFetch("/api/admin/reference");
+                renderFacts(data.facts);
+            } catch (err) {
+                showFactMsg(err.message, false);
+            }
+        }
+
+        async function deleteFact(id) {
+            try {
+                await adminFetch("/api/admin/reference/" + id, { method: "DELETE" });
+                loadFacts();
+            } catch (err) {
+                showFactMsg(err.message, false);
+            }
+        }
+
+        addFactBtn.addEventListener("click", async () => {
+            const keywords = factKeywordsEl.value.trim();
+            const question = factQuestionEl.value.trim();
+            const answer = factAnswerEl.value.trim();
+            if (!keywords || !question || !answer) return showFactMsg("Fill in keywords, question, and answer.", false);
+
+            addFactBtn.disabled = true;
+            try {
+                await adminFetch("/api/admin/reference", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ keywords, question, answer }),
+                });
+                factKeywordsEl.value = "";
+                factQuestionEl.value = "";
+                factAnswerEl.value = "";
+                showFactMsg("Fact added.", true);
+                loadFacts();
+            } catch (err) {
+                showFactMsg(err.message, false);
+            } finally {
+                addFactBtn.disabled = false;
+            }
+        });
+
+        loadFactsBtn.addEventListener("click", loadFacts);
+    </script>
+</body>
+
+</html>

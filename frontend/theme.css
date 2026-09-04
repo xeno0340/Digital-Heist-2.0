@@ -1,0 +1,245 @@
+/* Digital Heist 2.0 — shared design tokens + a small set of reusable
+   components, used by every page (login, map, admin, leaderboard).
+   Brand accent (the mint/teal) is sampled directly from the event poster's
+   glowing wordmark so the app and the poster read as the same brand.
+
+   Theme switching: <html data-theme="dark|light">, set as early as
+   possible by theme.js (before first paint) to avoid a flash of the
+   wrong theme. Dark is the brand default; light is the alternate. */
+
+:root {
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+
+    --radius-sm: 10px;
+    --radius: 16px;
+    --radius-lg: 22px;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .15);
+    --shadow: 0 8px 24px rgba(0, 0, 0, .28);
+    --shadow-lg: 0 20px 60px rgba(0, 0, 0, .38);
+}
+
+/* ---------- Dark (default) ---------- */
+:root,
+:root[data-theme="dark"] {
+    --bg: #06090b;
+    --surface: #0e1517;
+    --surface-2: #141d20;
+    --surface-3: #1b2528;
+    --border: #212d30;
+    --text: #eaf6f3;
+    --text-dim: #9fb3af;
+    --text-faint: #627875;
+
+    --accent: #7defc4;
+    /* sampled from the poster's glowing wordmark */
+    --accent-strong: #9dfedb;
+    --accent-dim: #35806a;
+    --accent-ink: #04140f;
+    /* text color placed ON TOP of --accent */
+
+    --danger: #ff7a68;
+    --danger-dim: #7a2e26;
+    --warn: #e8b04b;
+
+    --overlay: rgba(2, 4, 5, .72);
+    color-scheme: dark;
+}
+
+/* ---------- Light ---------- */
+:root[data-theme="light"] {
+    --bg: #f4f7f6;
+    --surface: #ffffff;
+    --surface-2: #eef3f2;
+    --surface-3: #e3ebe9;
+    --border: #d9e2e0;
+    --text: #0e1a17;
+    --text-dim: #4d5f5a;
+    --text-faint: #7c8f8a;
+
+    --accent: #0f9d76;
+    --accent-strong: #0c7f5f;
+    --accent-dim: #bfe9dc;
+    --accent-ink: #ffffff;
+
+    --danger: #c8402f;
+    --danger-dim: #f3d3ce;
+    --warn: #a9711f;
+
+    --overlay: rgba(20, 30, 28, .45);
+    color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    color-scheme: dark;
+}
+
+body {
+    margin: 0;
+    color: var(--text);
+    font-family: var(--font-ui);
+    transition: background-color .15s ease, color .15s ease;
+    /* Ambient corner glows instead of a flat fill — the same soft-light
+     treatment as the reference dashboard, tuned way down so it reads as
+     atmosphere, not decoration. Fixed so it doesn't scroll with content. */
+    background-color: var(--bg);
+    background-image:
+        radial-gradient(680px 460px at 12% -8%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 60%),
+        radial-gradient(560px 420px at 108% 8%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 62%);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+}
+
+a {
+    color: inherit;
+}
+
+/* ---------- Theme toggle switch ---------- */
+.theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    color: var(--text-dim);
+    user-select: none;
+}
+
+.theme-toggle .seg {
+    padding: 6px 12px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: background .15s ease, color .15s ease;
+}
+
+.theme-toggle .seg.active {
+    background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+    color: var(--accent-ink);
+    font-weight: 600;
+}
+
+/* ---------- Shared components ---------- */
+.btn {
+    font-family: var(--font-mono);
+    font-size: .85rem;
+    padding: 11px 18px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text);
+    cursor: pointer;
+    transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.btn:hover {
+    border-color: var(--accent-dim);
+    transform: translateY(-1px);
+}
+
+.btn:active {
+    transform: translateY(0) scale(.98);
+}
+
+.btn:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+    color: var(--accent-ink);
+    border-color: transparent;
+    font-weight: 700;
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.btn-primary:hover {
+    box-shadow: 0 8px 28px color-mix(in srgb, var(--accent) 50%, transparent);
+    filter: brightness(1.04);
+}
+
+.btn-primary:disabled {
+    box-shadow: none;
+}
+
+.btn-danger {
+    color: var(--danger);
+}
+
+.btn-danger:hover {
+    border-color: var(--danger);
+}
+
+.field label {
+    display: block;
+    font-size: .78rem;
+    font-family: var(--font-mono);
+    letter-spacing: .02em;
+    color: var(--text-dim);
+    margin: 0 0 6px;
+}
+
+.field input,
+.field select,
+.field textarea {
+    width: 100%;
+    background: color-mix(in srgb, var(--bg) 92%, var(--surface-2));
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    padding: 12px 14px;
+    font-size: .95rem;
+    font-family: var(--font-ui);
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.card {
+    background: linear-gradient(165deg, color-mix(in srgb, var(--surface) 100%, white 3%), var(--surface));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+}
+
+.banner {
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    font-size: .85rem;
+    font-family: var(--font-mono);
+}
+
+.banner-err {
+    background: color-mix(in srgb, var(--danger) 14%, transparent);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+}
+
+.banner-ok {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border: 1px solid var(--accent-dim);
+    color: var(--accent-strong);
+}

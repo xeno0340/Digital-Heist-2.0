@@ -1,0 +1,2996 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Digital Heist 2.0 — Dashboard</title>
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="theme.css" />
+    <style>
+        /* ================================================================
+     Shell: a persistent sidebar (team + node navigation + footer
+     actions) beside a main content area (stats, then whatever needs
+     attention right now). Replaces the old topbar+card-grid layout —
+     that put all ten nodes' full puzzle text on screen at once with no
+     hierarchy, which is what actually made it feel like a dense form.
+     Nodes are now a scannable nav list; puzzle text only appears once
+     you open one. ================================================ */
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .sidebar {
+            width: 280px;
+            flex-shrink: 0;
+            min-height: 100vh;
+            position: sticky;
+            top: 0;
+            align-self: flex-start;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+            background: color-mix(in srgb, var(--surface) 74%, transparent);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            z-index: 30;
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 22px 20px 18px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-header .brand-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 70%, transparent);
+            flex-shrink: 0;
+        }
+
+        .sidebar-header h1 {
+            font-family: var(--font-mono);
+            font-size: .92rem;
+            margin: 0;
+            letter-spacing: .03em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sidebar-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 10px 16px;
+        }
+
+        .nav-section-label {
+            font-family: var(--font-mono);
+            font-size: .66rem;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+            padding: 14px 12px 6px;
+        }
+
+        .nav-section-label:first-child {
+            padding-top: 4px;
+        }
+
+        .nav-node {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 9px 10px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: background .15s ease;
+        }
+
+        .nav-node:hover {
+            background: var(--surface-2);
+        }
+
+        .nav-node-badge {
+            width: 27px;
+            height: 27px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-size: .66rem;
+            font-weight: 700;
+            background: var(--surface-2);
+            color: var(--text-dim);
+            border: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .nav-node.done .nav-node-badge {
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: var(--accent-ink);
+            border-color: transparent;
+            box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 45%, transparent);
+        }
+
+        .nav-node-label {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .nav-node-title {
+            font-size: .87rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .nav-node.done .nav-node-title {
+            color: var(--text-dim);
+            font-weight: 500;
+        }
+
+        .nav-node-tag {
+            font-family: var(--font-mono);
+            font-size: .62rem;
+            letter-spacing: .06em;
+            color: var(--danger);
+        }
+
+        .sidebar-footer {
+            padding: 14px 14px 18px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .profile-menu {
+            position: relative;
+            margin-left: auto;
+        }
+
+        .profile-menu-btn {
+            width: 38px;
+            height: 38px;
+            padding: 0;
+            justify-content: center;
+            font-size: 1rem;
+        }
+
+        .profile-menu-btn[aria-expanded="true"] {
+            border-color: var(--accent);
+            color: var(--text);
+        }
+
+        .profile-dropdown {
+            display: none;
+            position: absolute;
+            right: 0;
+            bottom: calc(100% + 8px);
+            min-width: 190px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md, 10px);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            z-index: 20;
+        }
+
+        .profile-dropdown.open {
+            display: block;
+        }
+
+        .profile-dropdown-item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-family: var(--font-mono);
+            font-size: .78rem;
+            padding: 11px 14px;
+            cursor: pointer;
+            transition: background .12s ease, color .12s ease;
+        }
+
+        .profile-dropdown-item:hover {
+            background: var(--surface-2);
+            color: var(--text);
+        }
+
+        .profile-dropdown-item+.profile-dropdown-item {
+            border-top: 1px solid var(--border);
+        }
+
+        .profile-dropdown-item.danger {
+            color: var(--danger);
+        }
+
+        .profile-dropdown-item.danger:hover {
+            background: color-mix(in srgb, var(--danger) 12%, transparent);
+        }
+
+        .icon-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: color-mix(in srgb, var(--surface-2) 85%, transparent);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            color: var(--text-dim);
+            font-family: var(--font-mono);
+            font-size: .76rem;
+            padding: 8px 13px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: border-color .15s ease, color .15s ease, transform .15s ease;
+        }
+
+        .icon-btn:hover {
+            border-color: var(--accent-dim);
+            color: var(--text);
+            transform: translateY(-1px);
+        }
+
+        .icon-btn .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--danger);
+            display: none;
+        }
+
+        .icon-btn .dot.show {
+            display: inline-block;
+        }
+
+        /* ---- Mobile top strip (hidden on desktop) ---- */
+        .mobile-topbar {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 25;
+            background: color-mix(in srgb, var(--surface) 82%, transparent);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        .mobile-topbar .m-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .mobile-topbar h1 {
+            font-family: var(--font-mono);
+            font-size: .88rem;
+            margin: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 40vw;
+        }
+
+        .mobile-topbar .m-stats {
+            font-family: var(--font-mono);
+            font-size: .74rem;
+            color: var(--text-dim);
+            display: flex;
+            gap: 10px;
+        }
+
+        .mobile-topbar .m-stats b {
+            color: var(--accent);
+        }
+
+        #sidebarBackdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: var(--overlay);
+            z-index: 29;
+        }
+
+        #sidebarBackdrop.open {
+            display: block;
+        }
+
+        /* ================= Main content ================= */
+        .main {
+            flex: 1;
+            min-width: 0;
+            padding: 52px 34px 60px;
+            max-width: 900px;
+        }
+
+        .frozen-banner {
+            display: none;
+            background: color-mix(in srgb, var(--danger) 14%, transparent);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            font-family: var(--font-mono);
+            font-size: .85rem;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 18px;
+            text-align: center;
+        }
+
+        .frozen-banner.show {
+            display: block;
+        }
+
+        .stats-hero {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            margin-bottom: 22px;
+        }
+
+        .stat-tile {
+            padding: 18px 20px;
+        }
+
+        .stat-tile .label {
+            font-family: var(--font-mono);
+            font-size: .68rem;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+            margin: 0 0 10px;
+        }
+
+        .stat-tile .value {
+            font-family: var(--font-mono);
+            font-size: 1.9rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .stat-tile.accent .value {
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .stat-tile .progress-track {
+            margin-top: 13px;
+        }
+
+        .progress-track {
+            height: 7px;
+            background: var(--surface-2);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+            border-radius: 999px;
+            box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 55%, transparent);
+            transition: width .4s ease;
+        }
+
+        /* ---- Focus panel: the one thing that matters right now — either the
+     vault (once eligible) or a call to open the next unsolved node.
+     Never both, so there's always exactly one clear next action. ---- */
+        .focus-panel {
+            margin-bottom: 20px;
+        }
+
+        .focus-panel .eyebrow {
+            font-family: var(--font-mono);
+            font-size: .72rem;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin: 0 0 10px;
+        }
+
+        #focusNext {
+            padding: 30px 32px;
+        }
+
+        #focusNext h2 {
+            margin: 0 0 8px;
+            font-size: 1.5rem;
+            letter-spacing: -.01em;
+        }
+
+        #focusNext .sub {
+            color: var(--text-dim);
+            font-size: .9rem;
+            margin: 0 0 22px;
+        }
+
+        #focusNext .meta {
+            font-family: var(--font-mono);
+            font-size: .74rem;
+            color: var(--text-faint);
+            margin: 14px 0 0;
+        }
+
+        #focusNext[hidden] {
+            display: none;
+        }
+
+        .vault {
+            padding: 26px 30px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+            border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+            background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), var(--surface));
+            box-shadow: var(--shadow-sm), 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+        }
+
+        .vault[hidden] {
+            display: none;
+        }
+
+        .vault h2 {
+            font-family: var(--font-mono);
+            font-size: 1.1rem;
+            margin: 0 0 8px;
+            letter-spacing: .04em;
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .vault p {
+            font-size: .85rem;
+            color: var(--text-dim);
+            margin: 0 0 18px;
+        }
+
+        .vault .row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .vault .row input {
+            flex: 1;
+            min-width: 160px;
+            font-family: var(--font-mono);
+            letter-spacing: .06em;
+        }
+
+        .vault.reached {
+            opacity: .88;
+        }
+
+        /* Trophy strip — only shown once the vault is actually open. Reveals each
+     cleared node's shard code as a small collected badge; deliberately
+     never shown before that point so it can't work as an auto-fill hint
+     for the vault input above it. */
+        .vault-trophies {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 22px;
+            padding-top: 22px;
+            border-top: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+        }
+
+        .vault-trophies[hidden] {
+            display: none;
+        }
+
+        .trophy {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+        }
+
+        .trophy-badge {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: var(--accent-ink);
+            font-family: var(--font-mono);
+            font-size: .64rem;
+            font-weight: 700;
+        }
+
+        .trophy-info {
+            min-width: 0;
+        }
+
+        .trophy-title {
+            font-size: .76rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .trophy-code {
+            font-family: var(--font-mono);
+            font-size: .68rem;
+            letter-spacing: .06em;
+            color: var(--accent-strong);
+        }
+
+        /* ================= Full-screen overlays (shared) ================= */
+        .fullscreen {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            z-index: 40;
+            display: none;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .fullscreen.open {
+            display: flex;
+        }
+
+        .fs-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+
+        .fs-topbar .fs-title {
+            font-family: var(--font-mono);
+            font-size: .95rem;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .fs-topbar .fs-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .fs-body {
+            padding: 22px;
+            max-width: 640px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* ---- Informant / Reference: a centered modal card over a blurred
+     backdrop, rather than the full-page takeover the node view uses.
+     They're quick-reference tools you dip into, not a "mode" the way
+     solving a puzzle is - a floating card reads better for that. ---- */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: color-mix(in srgb, black 45%, transparent);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 39;
+            display: none;
+        }
+
+        .modal-backdrop.open {
+            display: block;
+        }
+
+        .modal-card {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(640px, calc(100vw - 32px));
+            max-height: min(680px, calc(100vh - 64px));
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            z-index: 40;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-card.open {
+            display: flex;
+        }
+
+        .modal-card .fs-topbar {
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        }
+
+        .modal-card .fs-body {
+            flex: 1;
+            overflow-y: auto;
+            max-width: none;
+        }
+
+        /* ---- Node view specifics ---- */
+        #nodeView .fs-body h2 {
+            font-family: var(--font-mono);
+            font-size: 1.3rem;
+            margin: 0 0 10px;
+        }
+
+        #nodeView .flavor {
+            font-size: 1rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+            margin: 0 0 20px;
+            white-space: pre-wrap;
+        }
+
+        .morse-blink {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            margin: 0 0 14px;
+            padding: 24px;
+            background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        .morse-blink[hidden] {
+            display: none;
+        }
+
+        .blink-light {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--surface-3);
+            border: 1px solid var(--border);
+            transition: background .05s linear, box-shadow .05s linear;
+        }
+
+        .blink-light.on {
+            background: var(--accent);
+            box-shadow: 0 0 26px 8px color-mix(in srgb, var(--accent) 65%, transparent);
+        }
+
+        .blink-speed {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: color-mix(in srgb, var(--surface) 70%, transparent);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 4px;
+            font-family: var(--font-mono);
+            font-size: .7rem;
+            color: var(--text-dim);
+            user-select: none;
+        }
+
+        .blink-speed .seg {
+            padding: 5px 10px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background .15s ease, color .15s ease;
+        }
+
+        .blink-speed .seg.active {
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: var(--accent-ink);
+            font-weight: 600;
+        }
+
+        .morse-ref {
+            margin: 0 0 18px;
+            padding: 10px 12px;
+            font-family: var(--font-mono);
+            font-size: .72rem;
+            color: var(--text-dim);
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+            gap: 4px 8px;
+        }
+
+        .morse-ref[hidden] {
+            display: none;
+        }
+
+        .morse-ref span b {
+            color: var(--text);
+        }
+
+        #nodeView .field {
+            margin-bottom: 14px;
+        }
+
+        #nodeView .actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        #nodeView .actions .btn {
+            flex: 1;
+        }
+
+        /* ---- Success overlay (correct-answer reveal) ---- */
+        #successOverlay {
+            position: fixed;
+            inset: 0;
+            background: var(--overlay);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            z-index: 60;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            cursor: pointer;
+        }
+
+        #successOverlay.open {
+            display: flex;
+        }
+
+        #successOverlay .success-card {
+            max-width: 380px;
+            width: 100%;
+            padding: 36px 32px;
+            text-align: center;
+            cursor: default;
+            box-shadow: var(--shadow-lg), 0 0 0 1px color-mix(in srgb, var(--accent) 15%, transparent);
+        }
+
+        #successOverlay .success-card .big-check {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 14px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+            color: var(--accent-ink);
+            box-shadow: 0 0 28px color-mix(in srgb, var(--accent) 55%, transparent);
+        }
+
+        #successOverlay .success-card h2 {
+            font-family: var(--font-mono);
+            margin: 0 0 14px;
+            font-size: 1.2rem;
+        }
+
+        #successOverlay .shard-code {
+            font-family: var(--font-mono);
+            font-size: 1.6rem;
+            letter-spacing: .1em;
+            color: var(--accent-strong);
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            margin: 0 0 12px;
+        }
+
+        #successOverlay .intel-line {
+            font-family: var(--font-mono);
+            font-size: .9rem;
+            color: var(--text-dim);
+            margin: 0 0 18px;
+        }
+
+        #successOverlay .dismiss-hint {
+            font-size: .74rem;
+            color: var(--text-faint);
+        }
+
+        /* ---- Informant panel ---- */
+        #informantPanel .chat-log {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 16px;
+            min-height: 200px;
+        }
+
+        .chat-bubble {
+            max-width: 85%;
+            padding: 10px 13px;
+            border-radius: var(--radius-sm);
+            font-size: .9rem;
+            line-height: 1.45;
+        }
+
+        .chat-bubble.user {
+            align-self: flex-end;
+            background: var(--accent);
+            color: var(--accent-ink);
+        }
+
+        .chat-bubble.assistant {
+            align-self: flex-start;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .chat-bubble.system {
+            align-self: center;
+            color: var(--text-faint);
+            font-family: var(--font-mono);
+            font-size: .78rem;
+            background: none;
+        }
+
+        #informantPanel .chat-input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        #informantPanel .chat-input-row input {
+            flex: 1;
+        }
+
+        #informantPanel .leverage-note {
+            font-family: var(--font-mono);
+            font-size: .78rem;
+            color: var(--text-dim);
+            margin: 0 0 14px;
+        }
+
+        /* ---- Reference console panel ---- */
+        #referencePanel .ref-results {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        #referencePanel .ref-item {
+            padding: 12px 14px;
+        }
+
+        #referencePanel .ref-item .q {
+            font-family: var(--font-mono);
+            font-size: .78rem;
+            color: var(--text-dim);
+            margin: 0 0 4px;
+        }
+
+        #referencePanel .ref-item .a {
+            font-size: .95rem;
+            margin: 0;
+        }
+
+        #referencePanel .ref-empty {
+            font-size: .85rem;
+            color: var(--text-faint);
+            text-align: center;
+            margin-top: 24px;
+        }
+
+        /* ================= Sabotage side drawer ================= */
+        #sabotageBackdrop {
+            position: fixed;
+            inset: 0;
+            background: var(--overlay);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 45;
+            display: none;
+        }
+
+        #sabotageBackdrop.open {
+            display: block;
+        }
+
+        #sabotageDrawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: min(420px, 100%);
+            background: var(--surface);
+            border-left: 1px solid var(--border);
+            z-index: 46;
+            transform: translateX(100%);
+            transition: transform .2s ease;
+            overflow-y: auto;
+            padding: 18px 20px 40px;
+        }
+
+        #sabotageDrawer.open {
+            transform: translateX(0);
+        }
+
+        #sabotageDrawer h2 {
+            font-family: var(--font-mono);
+            font-size: 1rem;
+            margin: 0 0 4px;
+            color: var(--accent);
+        }
+
+        #sabotageDrawer .sub {
+            font-size: .82rem;
+            color: var(--text-dim);
+            margin: 0 0 14px;
+        }
+
+        .drawer-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .sab-banner {
+            font-family: var(--font-mono);
+            font-size: .8rem;
+            padding: 9px 11px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+        }
+
+        .sab-banner.on {
+            background: color-mix(in srgb, var(--accent) 10%, transparent);
+            border-color: var(--accent-dim);
+            color: var(--accent-strong);
+        }
+
+        .sab-incoming {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .sab-incoming .effect {
+            font-family: var(--font-mono);
+            font-size: .8rem;
+            padding: 8px 10px;
+            border-radius: var(--radius-sm);
+            background: color-mix(in srgb, var(--danger) 12%, transparent);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+        }
+
+        .sab-self {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sab-self .status {
+            font-family: var(--font-mono);
+            font-size: .78rem;
+            color: var(--text-dim);
+        }
+
+        .rivals {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .rival-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+        }
+
+        .rival-row .name {
+            font-weight: 600;
+            min-width: 110px;
+            flex: 1 0 110px;
+            font-size: .88rem;
+        }
+
+        .move-btn {
+            font-family: var(--font-mono);
+            font-size: .72rem;
+            padding: 7px 9px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .move-btn:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        .move-btn.danger:hover:not(:disabled) {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .sab-feedback {
+            margin-top: 12px;
+            font-size: .82rem;
+            padding: 9px 11px;
+            border-radius: var(--radius-sm);
+            display: none;
+            font-family: var(--font-mono);
+        }
+
+        /* ================= Team profile gate ================= */
+        #profileGate {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            z-index: 70;
+            display: none;
+            align-items: flex-start;
+            justify-content: center;
+            overflow-y: auto;
+            padding: 40px 20px;
+        }
+
+        #profileGate.open {
+            display: flex;
+        }
+
+        #profileGate .gate-card {
+            max-width: 480px;
+            width: 100%;
+            padding: 30px;
+        }
+
+        #profileGate .eyebrow {
+            font-family: var(--font-mono);
+            font-size: .72rem;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin: 0 0 8px;
+        }
+
+        #profileGate h1 {
+            font-family: var(--font-mono);
+            font-size: 1.35rem;
+            margin: 0 0 6px;
+        }
+
+        #profileGate .sub {
+            color: var(--text-dim);
+            font-size: .88rem;
+            margin: 0 0 22px;
+            line-height: 1.5;
+        }
+
+        #profileGate .member-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 8px;
+            align-items: end;
+            margin-bottom: 12px;
+        }
+
+        #profileGate .member-row .field {
+            margin-bottom: 0;
+        }
+
+        #profileGate .remove-member {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            color: var(--text-faint);
+            border-radius: var(--radius-sm);
+            padding: 11px 12px;
+            cursor: pointer;
+            font-size: .85rem;
+            height: 44px;
+        }
+
+        #profileGate .remove-member:hover {
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        #profileGate .remove-member:disabled {
+            opacity: .3;
+            cursor: not-allowed;
+        }
+
+        #profileGate .add-member-row {
+            margin: 6px 0 20px;
+        }
+
+        #profileGate .gate-footer {
+            display: flex;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        #profileGate .gate-footer .btn {
+            flex: 1;
+        }
+
+        #profileGate .section-label {
+            font-family: var(--font-mono);
+            font-size: .74rem;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+            margin: 18px 0 10px;
+        }
+
+        @media (max-width: 560px) {
+            #profileGate .member-row {
+                grid-template-columns: 1fr;
+            }
+
+            #profileGate .remove-member {
+                width: 100%;
+                height: auto;
+            }
+        }
+
+        /* ================= Fullscreen gate + integrity lock =================
+     Two different things:
+     - #fsGate: a one-time prompt asking the team to enter fullscreen
+       before playing (browsers won't let a page force fullscreen without
+       a click). Dismisses itself the moment fullscreen is entered.
+     - #integrityLock: the hard stop shown the instant the team exits
+       fullscreen or switches tabs mid-game (see the fullscreenchange /
+       visibilitychange listeners below). Blocks all game interaction
+       until an admin clears it from admin.html — there is no team-side
+       "I promise it was an accident" button on purpose, since a
+       self-serve unlock would defeat the point.
+  ---------------------------------------------------------------------- */
+        #fsGate,
+        #integrityLock {
+            position: fixed;
+            inset: 0;
+            z-index: 90;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            text-align: center;
+            background: color-mix(in srgb, var(--bg) 96%, transparent);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        #integrityLock {
+            z-index: 95;
+            background: var(--bg);
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+        }
+
+        #fsGate.open,
+        #integrityLock.open {
+            display: flex;
+        }
+
+        #fsGate .gate-box,
+        #integrityLock .gate-box {
+            max-width: 460px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            padding: 32px 28px;
+        }
+
+        #integrityLock .gate-box {
+            border-color: var(--danger);
+        }
+
+        #fsGate .eyebrow,
+        #integrityLock .eyebrow {
+            font-family: var(--font-mono);
+            font-size: .72rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--text-faint);
+            margin: 0 0 8px;
+        }
+
+        #integrityLock .eyebrow {
+            color: var(--danger);
+        }
+
+        #fsGate h1,
+        #integrityLock h1 {
+            font-family: var(--font-mono);
+            font-size: 1.2rem;
+            margin: 0 0 10px;
+        }
+
+        #fsGate p,
+        #integrityLock p {
+            color: var(--text-dim);
+            font-size: .88rem;
+            line-height: 1.55;
+            margin: 0 0 20px;
+        }
+
+        #integrityLock .reason {
+            color: var(--text-faint);
+            font-family: var(--font-mono);
+            font-size: .76rem;
+            margin: -10px 0 20px;
+        }
+
+        @media (max-width: 480px) {
+            .fs-topbar {
+                padding: 10px 12px;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .fs-topbar .fs-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+
+            .fs-body {
+                padding: 18px;
+            }
+
+            .stats-hero {
+                grid-template-columns: 1fr;
+            }
+
+            #focusNext {
+                padding: 22px 20px;
+            }
+        }
+
+        /* ---- Sidebar becomes an off-canvas drawer below ~900px, opened from
+     the mobile top strip's hamburger. Same drawer pattern as the
+     sabotage panel, so it feels consistent rather than bolted on. ---- */
+        @media (max-width: 900px) {
+            body {
+                display: block;
+            }
+
+            .sidebar {
+                position: fixed;
+                inset: 0 auto 0 0;
+                width: 280px;
+                max-width: 82vw;
+                transform: translateX(-100%);
+                transition: transform .2s ease;
+                z-index: 60;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .mobile-topbar {
+                display: flex;
+            }
+
+            .main {
+                padding: 22px 18px 50px;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ================= Sidebar: brand, node nav, footer actions ================= -->
+    <div id="sidebarBackdrop"></div>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span class="brand-dot"></span>
+            <h1 id="teamLabel">DIGITAL HEIST 2.0</h1>
+        </div>
+        <div class="sidebar-scroll">
+            <div id="grid"></div>
+        </div>
+        <div class="sidebar-footer">
+            <button class="icon-btn" id="openInformantBtn2" type="button" title="The Informant">&#128373;
+                Informant</button>
+            <button class="icon-btn" id="openReferenceBtn2" type="button" title="Reference Console">&#128218;
+                Reference</button>
+            <button class="icon-btn" id="openSabotageBtn" type="button">
+                Sabotage <span class="dot" id="sabotageDot"></span>
+            </button>
+            <button class="theme-toggle" type="button" aria-label="Toggle theme">
+                <span class="seg" data-seg="dark">Dark</span>
+                <span class="seg" data-seg="light">Light</span>
+            </button>
+            <div class="profile-menu" id="profileMenu">
+                <button class="icon-btn profile-menu-btn" id="profileMenuBtn" type="button" title="Team profile"
+                    aria-haspopup="true" aria-expanded="false">&#128100;</button>
+                <div class="profile-dropdown" id="profileDropdown">
+                    <button class="profile-dropdown-item" id="editProfileBtn" type="button">Edit team profile</button>
+                    <button class="profile-dropdown-item danger" id="logoutBtn" type="button">Log out</button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ================= Mobile top strip (hidden on desktop) ================= -->
+    <div class="mobile-topbar">
+        <div class="m-left">
+            <button class="icon-btn" id="openSidebarBtn" type="button">&#9776;</button>
+            <h1 id="teamLabelMobile">DIGITAL HEIST 2.0</h1>
+        </div>
+        <div class="m-stats">
+            <span>Intel <b id="intelDisplayMobile">0</b></span>
+            <span>Score <b id="scoreDisplayMobile">0</b></span>
+        </div>
+    </div>
+
+    <!-- ================= Main content ================= -->
+    <div class="main">
+        <div class="frozen-banner" id="frozenBanner"></div>
+
+        <div class="stats-hero">
+            <div class="stat-tile card accent">
+                <p class="label">Intel</p>
+                <p class="value" id="intelDisplay">0</p>
+            </div>
+            <div class="stat-tile card">
+                <p class="label">Score</p>
+                <p class="value" id="scoreDisplay">0</p>
+            </div>
+            <div class="stat-tile card">
+                <p class="label" id="progressLabel">0 / 6 for the vault</p>
+                <div class="progress-track">
+                    <div class="progress-fill" id="progressFill" style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="focus-panel">
+            <div class="card" id="focusNext" hidden>
+                <p class="eyebrow">Up next</p>
+                <h2 id="focusNextTitle">—</h2>
+                <p class="sub" id="focusNextMeta">—</p>
+                <button class="btn btn-primary" id="focusNextBtn" type="button">Open node &rarr;</button>
+                <p class="meta" id="focusNextRemaining"></p>
+            </div>
+
+            <div class="vault card" id="vaultCard" hidden>
+                <h2 id="vaultTitle">THE VAULT</h2>
+                <p id="vaultSub">You've cleared enough nodes. Enter your shard codes in ascending node order, no spaces,
+                    to finish.</p>
+                <div class="row">
+                    <input id="vaultInput" type="text" autocomplete="off" spellcheck="false" />
+                    <button class="btn btn-primary" id="vaultSubmitBtn" type="button">Open vault</button>
+                </div>
+                <div class="banner" id="vaultFeedback" style="margin-top:12px;display:none;"></div>
+                <div class="vault-trophies" id="vaultTrophies" hidden></div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="staticCanvas"
+        style="position:fixed;inset:0;width:100%;height:100%;z-index:50;display:none;pointer-events:none;opacity:.88;image-rendering:pixelated;"></canvas>
+
+    <!-- ================= Full-screen node view ================= -->
+    <div class="fullscreen" id="nodeView">
+        <div class="fs-topbar">
+            <button class="icon-btn" id="closeNodeBtn" type="button">&larr; Back</button>
+            <span class="fs-title" id="modalTitle"></span>
+            <div class="fs-actions">
+                <button class="icon-btn" id="openInformantBtn" type="button" title="The Informant">🕵 Informant</button>
+                <button class="icon-btn" id="openReferenceBtn" type="button" title="Reference Console">📚
+                    Reference</button>
+                <button class="icon-btn" id="openSabotageBtn2" type="button">Sabotage</button>
+            </div>
+        </div>
+        <div class="fs-body">
+            <h2 id="modalNodeHeading"></h2>
+            <p class="flavor" id="modalFlavor"></p>
+            <div class="morse-blink" id="morseBlink" hidden>
+                <div class="blink-light" id="blinkLight"></div>
+                <button class="btn" id="blinkPlayBtn" type="button">&#9654; Play signal</button>
+                <div class="blink-speed" id="blinkSpeed">
+                    <span class="seg" data-speed="1">1x</span>
+                    <span class="seg" data-speed="0.75">0.75x</span>
+                    <span class="seg" data-speed="0.5">0.5x</span>
+                </div>
+            </div>
+            <div class="morse-ref" id="morseRef" hidden></div>
+            <div class="field">
+                <label for="answerInput">Your answer</label>
+                <input id="answerInput" type="text" autocomplete="off" />
+            </div>
+            <div class="actions">
+                <button class="btn" id="cancelBtn" type="button">Cancel</button>
+                <button class="btn btn-primary" id="submitAnswerBtn" type="button">Submit</button>
+            </div>
+            <div class="banner" id="feedback" style="margin-top:14px;display:none;"></div>
+        </div>
+    </div>
+
+    <!-- ================= Success reveal (correct answer) ================= -->
+    <div id="successOverlay">
+        <div class="card success-card" id="successCard">
+            <div class="big-check">&#10003;</div>
+            <h2>Node cleared</h2>
+            <div class="shard-code" id="successShard"></div>
+            <p class="intel-line" id="successIntel"></p>
+            <p class="dismiss-hint">Tap anywhere to continue</p>
+        </div>
+    </div>
+
+    <!-- ================= Informant panel ================= -->
+    <div class="modal-backdrop" id="informantBackdrop"></div>
+    <div class="modal-card" id="informantPanel">
+        <div class="fs-topbar">
+            <button class="icon-btn" id="closeInformantBtn" type="button">&larr; Back to node</button>
+            <span class="fs-title">The Informant</span>
+            <span></span>
+        </div>
+        <div class="fs-body">
+            <p class="leverage-note" id="leverageNote">Loading…</p>
+            <div class="chat-log" id="chatLog"></div>
+            <div class="chat-input-row">
+                <input id="informantInput" type="text" autocomplete="off" placeholder="Ask The Informant…" />
+                <button class="btn btn-primary" id="informantSendBtn" type="button">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= Reference console panel ================= -->
+    <div class="modal-backdrop" id="referenceBackdrop"></div>
+    <div class="modal-card" id="referencePanel">
+        <div class="fs-topbar">
+            <button class="icon-btn" id="closeReferenceBtn" type="button">&larr; Back to node</button>
+            <span class="fs-title">Reference Console</span>
+            <span></span>
+        </div>
+        <div class="fs-body">
+            <div class="field">
+                <label for="referenceInput">Search a fact</label>
+                <input id="referenceInput" type="text" autocomplete="off" placeholder="e.g. Titanic, founding year…" />
+            </div>
+            <div class="ref-results" id="refResults"></div>
+        </div>
+    </div>
+
+    <!-- ================= Sabotage side drawer ================= -->
+    <div id="sabotageBackdrop"></div>
+    <div id="sabotageDrawer">
+        <div class="drawer-head">
+            <div>
+                <h2>SABOTAGE</h2>
+                <p class="sub">Spend Intel to mess with rivals. Every move here comes straight out of your final score.
+                </p>
+            </div>
+            <button class="icon-btn" id="closeSabotageBtn" type="button">Close</button>
+        </div>
+        <div class="sab-banner" id="sabBanner"></div>
+        <div class="sab-incoming" id="sabIncoming"></div>
+        <div class="sab-self">
+            <button class="btn" id="shieldBtn" type="button">Shield</button>
+            <span class="status" id="shieldStatus"></span>
+        </div>
+        <div class="rivals" id="rivalsList"></div>
+        <div class="sab-feedback" id="sabFeedback"></div>
+    </div>
+
+    <!-- ================= Team profile gate ================= -->
+    <div id="profileGate">
+        <div class="card gate-card">
+            <p class="eyebrow">Team profile</p>
+            <h1 id="gateHeading">Before you start…</h1>
+            <p class="sub" id="gateSub">Add your team's members and your lead's contact info. You can edit this anytime
+                from the top bar.</p>
+
+            <div class="section-label">Team members (2–4)</div>
+            <div id="memberRows"></div>
+            <div class="add-member-row">
+                <button class="btn" id="addMemberBtn" type="button">+ Add member</button>
+            </div>
+
+            <div class="section-label">Team lead contact</div>
+            <div class="field">
+                <label for="leadEmail">Lead email</label>
+                <input id="leadEmail" type="email" autocomplete="off" />
+            </div>
+            <div class="field">
+                <label for="leadPhone">Lead phone</label>
+                <input id="leadPhone" type="tel" autocomplete="off" />
+            </div>
+
+            <div class="banner" id="gateFeedback" style="margin-top:6px;display:none;"></div>
+            <div class="gate-footer">
+                <button class="btn" id="gateCancelBtn" type="button" hidden>Cancel</button>
+                <button class="btn btn-primary" id="gateSaveBtn" type="button">Save and continue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= Fullscreen gate ================= -->
+    <div id="fsGate">
+        <div class="gate-box">
+            <p class="eyebrow">Before you start</p>
+            <h1>Play in fullscreen</h1>
+            <p>This station runs fullscreen for the whole event. Leaving fullscreen or switching to another tab or app
+                locks your team's screen until a volunteer clears it — so stay on this tab once you begin.</p>
+            <button class="btn btn-primary" id="fsGateBtn" type="button">Enter fullscreen &amp; begin</button>
+        </div>
+    </div>
+
+    <!-- ================= Integrity lock ================= -->
+    <div id="integrityLock">
+        <div class="gate-box">
+            <p class="eyebrow">Station locked</p>
+            <h1>Your team's screen is locked</h1>
+            <p>This happens when a team leaves fullscreen or switches tabs. Find a volunteer or the game master — only
+                they can unlock your station from here.</p>
+            <p class="reason" id="integrityLockReason"></p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "";
+        const teamId = localStorage.getItem("dh_team_id");
+        const teamName = localStorage.getItem("dh_team_name");
+
+        if (!teamId) {
+            window.location.href = "login.html";
+        }
+        document.getElementById("teamLabel").textContent = teamName ? teamName.toUpperCase() : "DIGITAL HEIST 2.0";
+
+        // ---------------------------------------------------------------------
+        // Team-deleted guard. If an admin deletes this team from admin.html
+        // while its browser is still open (mid-session), every teamId-scoped
+        // endpoint below starts returning 404 "No such team." Without this,
+        // a team's browser gets stuck: GET /profile for a deleted team looks
+        // IDENTICAL to a brand-new team that just hasn't filled the form in
+        // yet (its profile row cascade-deleted along with it), so the
+        // onboarding gate reopens and every save attempt into it just fails
+        // with no way out. isTeamGoneResponse() below recognizes that specific
+        // 404 from any endpoint; handleTeamGone() clears localStorage (this
+        // matters - login.html auto-redirects straight back here whenever
+        // dh_team_id is still set, which is exactly the loop a team could get
+        // stuck in otherwise) and bounces to a login screen that explains why.
+        // ---------------------------------------------------------------------
+        let teamGoneHandled = false;
+        function isTeamGoneResponse(res, data) {
+            return !!res && res.status === 404 && !!data && /no such team/i.test(data.error || "");
+        }
+        function handleTeamGone() {
+            if (teamGoneHandled) return;
+            teamGoneHandled = true;
+            localStorage.removeItem("dh_team_id");
+            localStorage.removeItem("dh_team_name");
+            window.location.href = "login.html?removed=1";
+        }
+
+        // ---------------------------------------------------------------------
+        // Body scroll lock — the full-screen overlays (node view, profile gate,
+        // Informant, Reference, success reveal) are position:fixed and cover the
+        // viewport regardless of scroll, but without this the dashboard behind
+        // them stays scrollable, which reads as a glitch on touch devices
+        // (rubber-band scroll can briefly reveal it). Reference-counted so
+        // stacked overlays (e.g. Informant opened from inside the node view)
+        // don't unlock the body until every one of them has closed.
+        // ---------------------------------------------------------------------
+        let scrollLockCount = 0;
+        function lockBodyScroll() {
+            scrollLockCount += 1;
+            document.body.style.overflow = "hidden";
+        }
+        function unlockBodyScroll() {
+            scrollLockCount = Math.max(0, scrollLockCount - 1);
+            if (scrollLockCount === 0) document.body.style.overflow = "";
+        }
+
+        // ===========================================================================
+        // Fullscreen gate + integrity lock — a deterrent, not real anti-cheat.
+        // It catches the obvious "leave the tab to open something else" move
+        // (Copilot's sidebar included, since opening it while the page is in
+        // true Fullscreen API mode kicks the page out of fullscreen); it does
+        // NOT catch a second device like a phone, and it CAN false-positive on
+        // an OS notification, a permission dialog, or a legitimate reason to
+        // alt-tab. That's exactly why unlocking is a manual admin action in
+        // admin.html and not something the team can clear themselves.
+        // ===========================================================================
+        const fsGate = document.getElementById("fsGate");
+        const fsGateBtn = document.getElementById("fsGateBtn");
+        const integrityLockEl = document.getElementById("integrityLock");
+        const integrityLockReasonEl = document.getElementById("integrityLockReason");
+
+        let integrityLocked = false;
+        let integrityArmed = false; // only watch for violations after the team has clicked through fsGate
+        let integrityPollTimer = null;
+
+        function showFsGate() {
+            if (vaultReached || integrityLocked) return;
+            fsGate.classList.add("open");
+            lockBodyScroll();
+        }
+        function hideFsGate() {
+            fsGate.classList.remove("open");
+            unlockBodyScroll();
+        }
+        function maybeShowFsGate() {
+            if (vaultReached || integrityLocked) return;
+            showFsGate();
+        }
+
+        function showIntegrityLock(reason) {
+            integrityLockReasonEl.textContent = reason ? "Reported: " + reason : "";
+            integrityLockEl.classList.add("open");
+            lockBodyScroll();
+        }
+        function hideIntegrityLock() {
+            integrityLockEl.classList.remove("open");
+            unlockBodyScroll();
+        }
+        function startIntegrityPoll() {
+            if (integrityPollTimer) return;
+            // Only way a locked team's screen comes back without a page reload —
+            // it re-checks the server's word on the lock, which only an admin's
+            // unlock click can change.
+            integrityPollTimer = setInterval(loadProgress, 5000);
+        }
+        function stopIntegrityPoll() {
+            if (integrityPollTimer) {
+                clearInterval(integrityPollTimer);
+                integrityPollTimer = null;
+            }
+        }
+
+        async function triggerIntegrityLock(reason) {
+            if (integrityLocked || vaultReached) return;
+            integrityLocked = true;
+            hideFsGate();
+            showIntegrityLock(reason);
+            startIntegrityPoll();
+            try {
+                await fetch(API_BASE + "/api/team/" + teamId + "/integrity-lock", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ reason }),
+                });
+            } catch (e) {
+                console.error("Integrity lock report failed:", e);
+            }
+        }
+
+        fsGateBtn.addEventListener("click", async () => {
+            try {
+                await document.documentElement.requestFullscreen();
+            } catch (e) {
+                // Fullscreen API isn't available everywhere (some mobile browsers
+                // refuse it outright) — don't strand the team behind a gate they
+                // have no way through. Tab-switch detection below still works
+                // without true fullscreen; it's only the "exited fullscreen" leg
+                // that needs the request to have actually succeeded.
+                console.error("Fullscreen request failed:", e);
+            }
+            integrityArmed = true;
+            hideFsGate();
+        });
+
+        document.addEventListener("fullscreenchange", () => {
+            if (!integrityArmed) return;
+            if (!document.fullscreenElement) triggerIntegrityLock("left fullscreen");
+        });
+        document.addEventListener("visibilitychange", () => {
+            if (!integrityArmed) return;
+            if (document.hidden) triggerIntegrityLock("switched tabs or apps");
+        });
+
+        // ===========================================================================
+        // Node data — structural only (title, runner flag). Actual puzzle text is
+        // per-team from /api/team/:teamId/nodes since most nodes are randomized
+        // server-side. The answer key never reaches the browser.
+        // ===========================================================================
+        const NODES = [
+            { id: 1, title: "Keypad Whisper", runner: false },
+            { id: 2, title: "The Broker's Ledger", runner: false },
+            { id: 3, title: "Paper Trail", runner: false },
+            { id: 4, title: "The Landmark", runner: false },
+            { id: 5, title: "Drop Point", runner: true },
+            { id: 6, title: "Signal in the Noise", runner: false },
+            { id: 7, title: "The Ask", runner: true },
+            { id: 8, title: "Anagram of the Mark", runner: false },
+            { id: 9, title: "The Broker's Riddle", runner: false },
+            { id: 10, title: "Last Mile", runner: true },
+        ];
+
+        let NEEDED_FOR_VAULT = 10; // fallback until loadProgress() sets the real value from the server
+        let completedNodes = new Set();
+        let shardCodes = {};
+        let vaultReached = false;
+        let activeNode = null;
+        let staticBurstActive = false;
+        let glitchInterval = null;
+        let reshuffleActive = false;
+        let reshuffleInterval = null;
+        let lockoutTimer = null;
+        let puzzleText = {};
+
+        const grid = document.getElementById("grid");
+        const nodeView = document.getElementById("nodeView");
+        const modalTitle = document.getElementById("modalTitle");
+        const modalNodeHeading = document.getElementById("modalNodeHeading");
+        const modalFlavor = document.getElementById("modalFlavor");
+        const morseBlink = document.getElementById("morseBlink");
+        const blinkLight = document.getElementById("blinkLight");
+        const blinkPlayBtn = document.getElementById("blinkPlayBtn");
+        const morseRef = document.getElementById("morseRef");
+        const answerInput = document.getElementById("answerInput");
+        const feedback = document.getElementById("feedback");
+        const intelDisplay = document.getElementById("intelDisplay");
+        const scoreDisplay = document.getElementById("scoreDisplay");
+        const intelDisplayMobile = document.getElementById("intelDisplayMobile");
+        const scoreDisplayMobile = document.getElementById("scoreDisplayMobile");
+        const progressLabel = document.getElementById("progressLabel");
+        const progressFill = document.getElementById("progressFill");
+
+        const MORSE_TABLE = {
+            A: ".-", B: "-...", C: "-.-.", D: "-..", E: ".", F: "..-.", G: "--.", H: "....",
+            I: "..", J: ".---", K: "-.-", L: ".-..", M: "--", N: "-.", O: "---", P: ".--.",
+            Q: "--.-", R: ".-.", S: "...", T: "-", U: "..-", V: "...-", W: ".--", X: "-..-",
+            Y: "-.--", Z: "--..",
+        };
+        morseRef.innerHTML = Object.entries(MORSE_TABLE)
+            .map(([letter, code]) => `<span><b>${letter}</b> ${code}</span>`)
+            .join("");
+
+        // ===========================================================================
+        // Morse blink player — Node 6's audio replacement. Same timing as the
+        // old .wav clips (0.1s per unit, dash = 3 units, gap between symbols in
+        // a letter = 1 unit, gap between letters = 3 units) so it's the same
+        // difficulty/pace as before, just a flashing light instead of a tone —
+        // no speakers required. `pattern` is dots/dashes/spaces from the
+        // backend (see wordToMorsePattern in data/nodes.js), never the word
+        // itself.
+        // ===========================================================================
+        const BLINK_UNIT_MS = 100;
+        let currentBlinkPattern = null;
+        let blinkTimers = [];
+        let blinkPlaying = false;
+        let blinkSpeed = 1; // 1x default — same pace as the original audio clips
+
+        const blinkSpeedEl = document.getElementById("blinkSpeed");
+        function setBlinkSpeed(speed) {
+            blinkSpeed = speed;
+            blinkSpeedEl.querySelectorAll(".seg").forEach((seg) => {
+                seg.classList.toggle("active", Number(seg.dataset.speed) === speed);
+            });
+        }
+        blinkSpeedEl.querySelectorAll(".seg").forEach((seg) => {
+            seg.addEventListener("click", () => setBlinkSpeed(Number(seg.dataset.speed)));
+        });
+        setBlinkSpeed(1);
+
+        function stopBlink() {
+            blinkTimers.forEach(clearTimeout);
+            blinkTimers = [];
+            blinkLight.classList.remove("on");
+            blinkPlaying = false;
+            blinkPlayBtn.disabled = false;
+        }
+
+        function playBlinkPattern(pattern) {
+            if (!pattern || blinkPlaying) return;
+            blinkPlaying = true;
+            blinkPlayBtn.disabled = true;
+            const unitMs = BLINK_UNIT_MS / blinkSpeed; // 0.5x speed = 2x the duration per unit
+            let t = 0;
+            const letters = pattern.split(" ");
+            letters.forEach((letter, li) => {
+                const symbols = letter.split("");
+                symbols.forEach((sym, si) => {
+                    const dur = sym === "-" ? unitMs * 3 : unitMs;
+                    const onAt = t;
+                    const offAt = t + dur;
+                    blinkTimers.push(setTimeout(() => blinkLight.classList.add("on"), onAt));
+                    blinkTimers.push(setTimeout(() => blinkLight.classList.remove("on"), offAt));
+                    t = offAt;
+                    if (si < symbols.length - 1) t += unitMs; // intra-letter gap
+                });
+                if (li < letters.length - 1) t += unitMs * 3; // inter-letter gap
+            });
+            blinkTimers.push(setTimeout(() => {
+                blinkPlaying = false;
+                blinkPlayBtn.disabled = false;
+            }, t));
+        }
+
+        blinkPlayBtn.addEventListener("click", () => playBlinkPattern(currentBlinkPattern));
+
+        // ===========================================================================
+        // Text-obscuring effects (Static Burst / Reshuffle) — unchanged from the
+        // previous version, just relocated.
+        // ===========================================================================
+        const GLITCH_CHARS = "!@#$%^&*<>?/\\|~▓▒░01";
+        function glitchify(text) {
+            return text.replace(/\S/g, (ch) => (Math.random() < 0.45 ? GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)] : ch));
+        }
+        function jumbleText(text) {
+            return text.replace(/[A-Za-z0-9]+/g, (word) => {
+                const chars = word.split("");
+                for (let i = chars.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [chars[i], chars[j]] = [chars[j], chars[i]];
+                }
+                return chars.join("");
+            });
+        }
+        function obscureText(text) {
+            let out = text;
+            if (reshuffleActive) out = jumbleText(out);
+            if (staticBurstActive) out = glitchify(out);
+            return out;
+        }
+
+        const staticCanvas = document.getElementById("staticCanvas");
+        const staticCtx = staticCanvas.getContext("2d");
+        let staticNoiseTimer = null;
+
+        function drawStaticFrame() {
+            const w = staticCanvas.width;
+            const h = staticCanvas.height;
+            const imgData = staticCtx.createImageData(w, h);
+            const buf = imgData.data;
+            for (let i = 0; i < buf.length; i += 4) {
+                const v = (Math.random() * 255) | 0;
+                buf[i] = v; buf[i + 1] = v; buf[i + 2] = v; buf[i + 3] = 255;
+            }
+            staticCtx.putImageData(imgData, 0, 0);
+        }
+        function startStaticNoise() {
+            staticCanvas.width = 160;
+            staticCanvas.height = 100;
+            staticCanvas.style.display = "block";
+            clearInterval(staticNoiseTimer);
+            staticNoiseTimer = setInterval(drawStaticFrame, 70);
+            drawStaticFrame();
+        }
+        function stopStaticNoise() {
+            clearInterval(staticNoiseTimer);
+            staticNoiseTimer = null;
+            staticCanvas.style.display = "none";
+        }
+        function setStaticBurst(active) {
+            if (active === staticBurstActive) return;
+            staticBurstActive = active;
+            clearInterval(glitchInterval);
+            if (active) {
+                startStaticNoise();
+                glitchInterval = setInterval(() => {
+                    renderGrid();
+                    if (activeNode) {
+                        const text = puzzleText[activeNode.id];
+                        if (text) modalFlavor.textContent = obscureText(text.display);
+                    }
+                }, 250);
+            } else {
+                stopStaticNoise();
+                renderGrid();
+                if (activeNode) {
+                    const text = puzzleText[activeNode.id];
+                    modalFlavor.textContent = text ? obscureText(text.display) : "Loading puzzle…";
+                }
+            }
+        }
+        function setReshuffle(active) {
+            if (active === reshuffleActive) return;
+            reshuffleActive = active;
+            clearInterval(reshuffleInterval);
+            if (active) {
+                reshuffleInterval = setInterval(() => {
+                    renderGrid();
+                    if (activeNode) {
+                        const text = puzzleText[activeNode.id];
+                        if (text) modalFlavor.textContent = obscureText(text.display);
+                    }
+                }, 300);
+            } else {
+                renderGrid();
+                if (activeNode) {
+                    const text = puzzleText[activeNode.id];
+                    modalFlavor.textContent = text ? obscureText(text.display) : "Loading puzzle…";
+                }
+            }
+        }
+
+        // ===========================================================================
+        // Sidebar node navigation — compact rows grouped Active/Cleared, no puzzle
+        // text here at all (that only ever shows inside the full-screen node view).
+        // Reshuffle still jumbles the visible titles; Static Burst has nothing to
+        // glitch here anymore since there's no flavor text in the sidebar.
+        // ===========================================================================
+        function buildNavRow(node) {
+            const done = completedNodes.has(node.id);
+            let title = node.title;
+            if (!done && reshuffleActive) title = jumbleText(title);
+            const el = document.createElement("div");
+            el.className = "nav-node" + (done ? " done" : "");
+            el.innerHTML = `
+      <div class="nav-node-badge">${done ? "&#10003;" : String(node.id).padStart(2, "0")}</div>
+      <div class="nav-node-label">
+        <span class="nav-node-title">${title}</span>
+        ${node.runner ? '<span class="nav-node-tag">RUNNER</span>' : ""}
+      </div>
+    `;
+            el.addEventListener("click", () => openNodeView(node));
+            return el;
+        }
+
+        function renderGrid() {
+            grid.innerHTML = "";
+            const active = NODES.filter((n) => !completedNodes.has(n.id));
+            const cleared = NODES.filter((n) => completedNodes.has(n.id));
+
+            if (active.length) {
+                const label = document.createElement("div");
+                label.className = "nav-section-label";
+                label.textContent = "Active";
+                grid.appendChild(label);
+                active.forEach((n) => grid.appendChild(buildNavRow(n)));
+            }
+            if (cleared.length) {
+                const label = document.createElement("div");
+                label.className = "nav-section-label";
+                label.textContent = "Cleared";
+                grid.appendChild(label);
+                cleared.forEach((n) => grid.appendChild(buildNavRow(n)));
+            }
+            renderFocusPanel();
+        }
+
+        function updateProgressUI(intel, score) {
+            intelDisplay.textContent = intel;
+            intelDisplayMobile.textContent = intel;
+            if (score !== undefined) {
+                scoreDisplay.textContent = score;
+                scoreDisplayMobile.textContent = score;
+            }
+            const cleared = completedNodes.size;
+            progressLabel.textContent = `${cleared} / ${NEEDED_FOR_VAULT} needed for the vault`;
+            progressFill.style.width = Math.min(100, (cleared / NEEDED_FOR_VAULT) * 100) + "%";
+            renderVault();
+            renderFocusPanel();
+        }
+
+        // ===========================================================================
+        // Focus panel — exactly one of "up next" or the vault is ever showing.
+        // The vault takes priority once it's reachable; otherwise this surfaces the
+        // lowest-numbered uncleared node so there's always one obvious next step
+        // instead of a wall of nodes to scan.
+        // ===========================================================================
+        const focusNext = document.getElementById("focusNext");
+        const focusNextTitle = document.getElementById("focusNextTitle");
+        const focusNextMeta = document.getElementById("focusNextMeta");
+        const focusNextBtn = document.getElementById("focusNextBtn");
+        const focusNextRemaining = document.getElementById("focusNextRemaining");
+
+        function renderFocusPanel() {
+            const showVault = vaultReached || completedNodes.size >= NEEDED_FOR_VAULT;
+            if (showVault) {
+                focusNext.hidden = true;
+                return;
+            }
+            const next = NODES.find((n) => !completedNodes.has(n.id));
+            if (!next) {
+                focusNext.hidden = true;
+                return;
+            }
+            focusNext.hidden = false;
+            focusNextTitle.textContent = next.title;
+            focusNextMeta.textContent = next.runner
+                ? `Node ${String(next.id).padStart(2, "0")} — a runner puzzle.`
+                : `Node ${String(next.id).padStart(2, "0")}.`;
+            const remaining = Math.max(0, NEEDED_FOR_VAULT - completedNodes.size);
+            focusNextRemaining.textContent = remaining
+                ? `${remaining} more node${remaining === 1 ? "" : "s"} to reach the vault.`
+                : "";
+            focusNextBtn.onclick = () => openNodeView(next);
+        }
+
+        // ===========================================================================
+        // Vault
+        // ===========================================================================
+        const vaultCard = document.getElementById("vaultCard");
+        const vaultTitle = document.getElementById("vaultTitle");
+        const vaultSub = document.getElementById("vaultSub");
+        const vaultInput = document.getElementById("vaultInput");
+        const vaultSubmitBtn = document.getElementById("vaultSubmitBtn");
+        const vaultFeedback = document.getElementById("vaultFeedback");
+        const vaultTrophies = document.getElementById("vaultTrophies");
+
+        // Renders the trophy strip — every cleared node with its shard code, as a
+        // recap. Only ever called from the vaultReached branch below: showing
+        // codes anywhere before the vault is actually open would work as an
+        // auto-fill hint, which was deliberately removed.
+        function renderVaultTrophies() {
+            vaultTrophies.innerHTML = "";
+            for (const node of NODES) {
+                if (!completedNodes.has(node.id)) continue;
+                const code = shardCodes[node.id];
+                const el = document.createElement("div");
+                el.className = "trophy";
+                el.innerHTML = `
+        <div class="trophy-badge">${String(node.id).padStart(2, "0")}</div>
+        <div class="trophy-info">
+          <div class="trophy-title">${node.title}</div>
+          ${code ? `<div class="trophy-code">${code}</div>` : ""}
+        </div>
+      `;
+                vaultTrophies.appendChild(el);
+            }
+            vaultTrophies.hidden = false;
+        }
+
+        function renderVault() {
+            if (vaultReached) {
+                vaultCard.hidden = false;
+                vaultCard.classList.add("reached");
+                vaultTitle.textContent = "VAULT OPEN";
+                vaultSub.textContent = "Your team already reached the vault. Nice work.";
+                vaultInput.hidden = true;
+                vaultSubmitBtn.hidden = true;
+                renderVaultTrophies();
+                return;
+            }
+            vaultTrophies.hidden = true;
+            if (completedNodes.size < NEEDED_FOR_VAULT) {
+                vaultCard.hidden = true;
+                return;
+            }
+            vaultCard.hidden = false;
+            vaultCard.classList.remove("reached");
+            vaultInput.hidden = false;
+            vaultSubmitBtn.hidden = false;
+            // Deliberately NOT auto-filled from cleared shard codes anymore — teams
+            // have to recall and type the code themselves. (Resubmitting a cleared
+            // node's answer still echoes its shard code back in the plain feedback
+            // banner — that fallback stays, it's just never surfaced or hinted here.)
+        }
+
+        async function submitVault() {
+            const code = vaultInput.value.trim();
+            if (!code) return;
+            vaultSubmitBtn.disabled = true;
+            vaultFeedback.style.display = "none";
+            vaultFeedback.className = "banner";
+            try {
+                const res = await fetch(API_BASE + "/api/vault/submit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ teamId, code }),
+                });
+                const data = await res.json();
+                if (isTeamGoneResponse(res, data)) return handleTeamGone();
+                if (data.correct) {
+                    vaultReached = true;
+                    vaultFeedback.textContent = data.alreadyReached
+                        ? "Already opened."
+                        : `Vault opened! Arrival order: #${data.arrivalRank ?? "?"}.`;
+                    vaultFeedback.className = "banner banner-ok";
+                    vaultFeedback.style.display = "block";
+                    renderVault();
+                } else if (data.frozen) {
+                    vaultFeedback.textContent = `Frozen by a rival — try again in ${data.secondsLeft}s.`;
+                    vaultFeedback.className = "banner banner-err";
+                    vaultFeedback.style.display = "block";
+                    startFrozenCountdown(data.secondsLeft);
+                } else if (data.integrityLocked) {
+                    if (!integrityLocked) { integrityLocked = true; showIntegrityLock(data.reason); startIntegrityPoll(); }
+                } else {
+                    vaultFeedback.textContent = data.error || "That's not it — check your shard codes and try again.";
+                    vaultFeedback.className = "banner banner-err";
+                    vaultFeedback.style.display = "block";
+                }
+            } catch (e) {
+                vaultFeedback.textContent = "Couldn't reach the server — try again.";
+                vaultFeedback.className = "banner banner-err";
+                vaultFeedback.style.display = "block";
+            } finally {
+                vaultSubmitBtn.disabled = false;
+            }
+        }
+        vaultSubmitBtn.addEventListener("click", submitVault);
+        vaultInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitVault(); });
+
+        // ===========================================================================
+        // Full-screen node view
+        // ===========================================================================
+        function openNodeView(node) {
+            activeNode = node;
+            setActiveNode(node.id);
+            const text = puzzleText[node.id];
+            modalTitle.textContent = `Node ${String(node.id).padStart(2, "0")}`;
+            modalNodeHeading.textContent = node.title;
+            modalFlavor.textContent = text ? obscureText(text.display) : "Loading puzzle…";
+            stopBlink();
+            if (text && text.pattern) {
+                currentBlinkPattern = text.pattern;
+                morseBlink.hidden = false;
+                morseRef.hidden = false;
+            } else {
+                currentBlinkPattern = null;
+                morseBlink.hidden = true;
+                morseRef.hidden = true;
+            }
+            clearInterval(lockoutTimer);
+            submitAnswerBtn.disabled = false;
+            answerInput.value = "";
+            feedback.style.display = "none";
+            feedback.className = "banner";
+            nodeView.classList.add("open");
+            lockBodyScroll();
+            answerInput.focus();
+        }
+
+        function closeNodeView() {
+            nodeView.classList.remove("open");
+            unlockBodyScroll();
+            stopBlink();
+            currentBlinkPattern = null;
+            clearInterval(lockoutTimer);
+            activeNode = null;
+            setActiveNode(null);
+        }
+
+        document.getElementById("cancelBtn").addEventListener("click", closeNodeView);
+        document.getElementById("closeNodeBtn").addEventListener("click", closeNodeView);
+
+        const submitAnswerBtn = document.getElementById("submitAnswerBtn");
+
+        function startLockoutCountdown(seconds) {
+            clearInterval(lockoutTimer);
+            let remaining = seconds;
+            submitAnswerBtn.disabled = true;
+            const tick = () => {
+                feedback.textContent = `Locked out — try again in ${remaining}s.`;
+                feedback.className = "banner banner-err";
+                feedback.style.display = "block";
+                if (remaining <= 0) {
+                    clearInterval(lockoutTimer);
+                    submitAnswerBtn.disabled = false;
+                    feedback.style.display = "none";
+                }
+                remaining -= 1;
+            };
+            tick();
+            lockoutTimer = setInterval(tick, 1000);
+        }
+
+        // ---- Success reveal: shown on a genuinely NEW correct answer. Auto-closes
+        // after ~5.5s, or immediately on click/tap anywhere on it. Closing it also
+        // closes the node view, returning the team to the dashboard. ----
+        const successOverlay = document.getElementById("successOverlay");
+        const successShard = document.getElementById("successShard");
+        const successIntel = document.getElementById("successIntel");
+        let successTimer = null;
+
+        function showSuccessReveal(shardCode, intelAwarded) {
+            successShard.textContent = shardCode;
+            successIntel.textContent = intelAwarded ? `+${intelAwarded} Intel` : "";
+            successOverlay.classList.add("open");
+            clearTimeout(successTimer);
+            successTimer = setTimeout(dismissSuccessReveal, 5500);
+        }
+        function dismissSuccessReveal() {
+            clearTimeout(successTimer);
+            successOverlay.classList.remove("open");
+            closeNodeView();
+        }
+        successOverlay.addEventListener("click", dismissSuccessReveal);
+
+        async function submitAnswer() {
+            if (!activeNode) return;
+            const answer = answerInput.value.trim();
+            if (!answer) return;
+
+            const res = await fetch(API_BASE + "/api/node/submit", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ teamId, nodeId: activeNode.id, answer }),
+            });
+            const data = await res.json();
+            if (isTeamGoneResponse(res, data)) return handleTeamGone();
+
+            if (data.correct) {
+                completedNodes.add(activeNode.id);
+                shardCodes[activeNode.id] = data.shardCode;
+                renderGrid();
+                if (data.alreadyCompleted) {
+                    // Recovery path for a forgotten shard code — kept exactly as before,
+                    // but deliberately surfaced as a plain inline banner rather than the
+                    // celebratory success screen, so it never reads as an intended,
+                    // advertised way to look up your code.
+                    feedback.textContent = "Already cleared — shard code: " + data.shardCode;
+                    feedback.className = "banner banner-ok";
+                    feedback.style.display = "block";
+                    renderVault();
+                } else {
+                    updateProgressUI(data.totalIntel);
+                    showSuccessReveal(data.shardCode, data.intelAwarded);
+                }
+            } else if (data.frozen) {
+                feedback.textContent = `Frozen by a rival — try again in ${data.secondsLeft}s.`;
+                feedback.className = "banner banner-err";
+                feedback.style.display = "block";
+                startFrozenCountdown(data.secondsLeft);
+            } else if (data.integrityLocked) {
+                if (!integrityLocked) { integrityLocked = true; showIntegrityLock(data.reason); startIntegrityPoll(); }
+            } else if (data.secondsLeft) {
+                startLockoutCountdown(data.secondsLeft);
+            } else {
+                feedback.textContent = "Not quite — try again.";
+                feedback.className = "banner banner-err";
+                feedback.style.display = "block";
+            }
+        }
+        submitAnswerBtn.addEventListener("click", submitAnswer);
+        answerInput.addEventListener("keydown", (e) => { if (e.key === "Enter") submitAnswer(); });
+
+        document.getElementById("logoutBtn").addEventListener("click", () => {
+            localStorage.removeItem("dh_team_id");
+            localStorage.removeItem("dh_team_name");
+            window.location.href = "login.html";
+        });
+
+        const profileMenuBtn = document.getElementById("profileMenuBtn");
+        const profileDropdown = document.getElementById("profileDropdown");
+        function closeProfileMenu() {
+            profileDropdown.classList.remove("open");
+            profileMenuBtn.setAttribute("aria-expanded", "false");
+        }
+        function toggleProfileMenu() {
+            const willOpen = !profileDropdown.classList.contains("open");
+            profileDropdown.classList.toggle("open", willOpen);
+            profileMenuBtn.setAttribute("aria-expanded", String(willOpen));
+        }
+        profileMenuBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleProfileMenu();
+        });
+        document.addEventListener("click", (e) => {
+            if (!e.target.closest("#profileMenu")) closeProfileMenu();
+        });
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") closeProfileMenu();
+        });
+        // Picking either dropdown action should close the menu itself.
+        document.getElementById("editProfileBtn").addEventListener("click", closeProfileMenu);
+        document.getElementById("logoutBtn").addEventListener("click", closeProfileMenu);
+
+        async function loadProgress() {
+            try {
+                const res = await fetch(API_BASE + "/api/team/" + teamId + "/progress");
+                const data = await res.json();
+                if (isTeamGoneResponse(res, data)) return handleTeamGone();
+                completedNodes = new Set(data.nodesCleared || []);
+                shardCodes = data.shardCodes || {};
+                vaultReached = !!data.vaultReached;
+                if (data.neededForVault) NEEDED_FOR_VAULT = data.neededForVault;
+
+                // Server is the source of truth for the integrity lock — this is
+                // what picks up an admin's unlock click without needing a page
+                // reload (see startIntegrityPoll), and what re-shows the block on
+                // a fresh page load if a team reloads while still locked.
+                if (data.integrityLocked) {
+                    if (!integrityLocked) {
+                        integrityLocked = true;
+                        showIntegrityLock(data.integrityLockReason);
+                        startIntegrityPoll();
+                    }
+                } else if (integrityLocked) {
+                    integrityLocked = false;
+                    hideIntegrityLock();
+                    stopIntegrityPoll();
+                }
+                if (vaultReached) hideFsGate();
+
+                renderGrid();
+                updateProgressUI(data.intel || 0, data.score);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function loadPuzzles() {
+            try {
+                const res = await fetch(API_BASE + "/api/team/" + teamId + "/nodes");
+                const data = await res.json();
+                if (isTeamGoneResponse(res, data)) return handleTeamGone();
+                puzzleText = {};
+                for (const n of data.nodes || []) puzzleText[n.id] = { display: n.display, pattern: n.pattern };
+                renderGrid();
+                if (activeNode) {
+                    const text = puzzleText[activeNode.id];
+                    if (text) modalFlavor.textContent = obscureText(text.display);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // ===========================================================================
+        // The Informant panel
+        // ===========================================================================
+        const informantPanel = document.getElementById("informantPanel");
+        const closeInformantBtn = document.getElementById("closeInformantBtn");
+        const chatLog = document.getElementById("chatLog");
+        const leverageNote = document.getElementById("leverageNote");
+        const informantInput = document.getElementById("informantInput");
+        const informantSendBtn = document.getElementById("informantSendBtn");
+        const informantBackdrop = document.getElementById("informantBackdrop");
+        let informantGameOver = false;
+
+        // Reachable from the sidebar (no node open) as well as from inside a
+        // node's full-screen view - the back label should match wherever a
+        // team actually came from instead of always claiming a node is waiting.
+        function backLabelFor(btn) {
+            btn.innerHTML = activeNode ? "&larr; Back to node" : "&larr; Back";
+        }
+
+        function renderChatLog(history) {
+            chatLog.innerHTML = "";
+            for (const turn of history) {
+                const el = document.createElement("div");
+                el.className = "chat-bubble " + (turn.role === "user" ? "user" : "assistant");
+                el.textContent = turn.text;
+                chatLog.appendChild(el);
+            }
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function setInformantBusy(busy) {
+            informantInput.disabled = busy || informantGameOver;
+            informantSendBtn.disabled = busy || informantGameOver;
+        }
+
+        async function openInformantPanel() {
+            informantPanel.classList.add("open");
+            informantBackdrop.classList.add("open");
+            backLabelFor(closeInformantBtn);
+            lockBodyScroll();
+            leverageNote.textContent = "Loading…";
+            setInformantBusy(true);
+            try {
+                const res = await fetch(API_BASE + "/api/informant/" + teamId);
+                const data = await res.json();
+                informantGameOver = !!data.gameOver;
+                leverageNote.textContent = informantGameOver
+                    ? "The channel has gone dark — no leverage left."
+                    : `${data.leverage} question${data.leverage === 1 ? "" : "s"} of leverage left.`;
+                if ((data.history || []).length === 0) {
+                    // Nothing said yet — ask for the opening line.
+                    renderChatLog([]);
+                    const openRes = await fetch(API_BASE + "/api/informant", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ teamId }),
+                    });
+                    const openData = await openRes.json();
+                    renderChatLog([{ role: "assistant", text: openData.reply }]);
+                    informantGameOver = !!openData.gameOver;
+                    leverageNote.textContent = informantGameOver
+                        ? "The channel has gone dark — no leverage left."
+                        : `${openData.leverage} question${openData.leverage === 1 ? "" : "s"} of leverage left.`;
+                } else {
+                    renderChatLog(data.history);
+                }
+            } catch (e) {
+                leverageNote.textContent = "Couldn't reach The Informant.";
+            } finally {
+                setInformantBusy(false);
+            }
+        }
+
+        async function sendInformantMessage() {
+            const message = informantInput.value.trim();
+            if (!message || informantGameOver) return;
+            const userBubble = document.createElement("div");
+            userBubble.className = "chat-bubble user";
+            userBubble.textContent = message;
+            chatLog.appendChild(userBubble);
+            chatLog.scrollTop = chatLog.scrollHeight;
+            informantInput.value = "";
+            setInformantBusy(true);
+            try {
+                const res = await fetch(API_BASE + "/api/informant", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ teamId, message }),
+                });
+                const data = await res.json();
+                if (data.error) {
+                    const sysBubble = document.createElement("div");
+                    sysBubble.className = "chat-bubble system";
+                    sysBubble.textContent = data.error;
+                    chatLog.appendChild(sysBubble);
+                } else {
+                    const replyBubble = document.createElement("div");
+                    replyBubble.className = "chat-bubble assistant";
+                    replyBubble.textContent = data.reply;
+                    chatLog.appendChild(replyBubble);
+                    informantGameOver = !!data.gameOver;
+                    leverageNote.textContent = informantGameOver
+                        ? "The channel has gone dark — no leverage left."
+                        : `${data.leverage} question${data.leverage === 1 ? "" : "s"} of leverage left.`;
+                }
+                chatLog.scrollTop = chatLog.scrollHeight;
+            } catch (e) {
+                const sysBubble = document.createElement("div");
+                sysBubble.className = "chat-bubble system";
+                sysBubble.textContent = "Couldn't reach the server — try again.";
+                chatLog.appendChild(sysBubble);
+            } finally {
+                setInformantBusy(false);
+            }
+        }
+
+        document.getElementById("openInformantBtn").addEventListener("click", openInformantPanel);
+        document.getElementById("openInformantBtn2").addEventListener("click", openInformantPanel);
+        function closeInformantPanel() {
+            informantPanel.classList.remove("open");
+            informantBackdrop.classList.remove("open");
+            unlockBodyScroll();
+        }
+        document.getElementById("closeInformantBtn").addEventListener("click", closeInformantPanel);
+        informantBackdrop.addEventListener("click", closeInformantPanel);
+        informantSendBtn.addEventListener("click", sendInformantMessage);
+        informantInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendInformantMessage(); });
+
+        // ===========================================================================
+        // Reference Console panel
+        // ===========================================================================
+        const referencePanel = document.getElementById("referencePanel");
+        const closeReferenceBtn = document.getElementById("closeReferenceBtn");
+        const referenceBackdrop = document.getElementById("referenceBackdrop");
+        const referenceInput = document.getElementById("referenceInput");
+        const refResults = document.getElementById("refResults");
+        let refDebounce = null;
+
+        function renderRefResults(results) {
+            refResults.innerHTML = "";
+            if (!results.length) {
+                const q = referenceInput.value.trim();
+                const empty = document.createElement("p");
+                empty.className = "ref-empty";
+                empty.textContent = q.length < 2 ? "Type at least 2 characters to search." : "No matches for that.";
+                refResults.appendChild(empty);
+                return;
+            }
+            for (const r of results) {
+                const el = document.createElement("div");
+                el.className = "ref-item card";
+                el.innerHTML = `<p class="q">${r.question}</p><p class="a">${r.answer}</p>`;
+                refResults.appendChild(el);
+            }
+        }
+
+        async function runReferenceSearch() {
+            const q = referenceInput.value.trim();
+            if (q.length < 2) { renderRefResults([]); return; }
+            try {
+                const res = await fetch(API_BASE + "/api/reference/search?q=" + encodeURIComponent(q));
+                const data = await res.json();
+                renderRefResults(data.results || []);
+            } catch (e) {
+                renderRefResults([]);
+            }
+        }
+
+        referenceInput.addEventListener("input", () => {
+            clearTimeout(refDebounce);
+            refDebounce = setTimeout(runReferenceSearch, 300);
+        });
+        // Openable from the sidebar (no node needs to be open) as well as from
+        // inside a node's full-screen view - same panel either way, just two
+        // entry points, mirroring how Sabotage already works.
+        function openReferencePanel() {
+            referencePanel.classList.add("open");
+            referenceBackdrop.classList.add("open");
+            backLabelFor(closeReferenceBtn);
+            lockBodyScroll();
+            renderRefResults([]);
+            referenceInput.value = "";
+            referenceInput.focus();
+        }
+        document.getElementById("openReferenceBtn").addEventListener("click", openReferencePanel);
+        document.getElementById("openReferenceBtn2").addEventListener("click", openReferencePanel);
+        function closeReferencePanel() {
+            referencePanel.classList.remove("open");
+            referenceBackdrop.classList.remove("open");
+            unlockBodyScroll();
+        }
+        document.getElementById("closeReferenceBtn").addEventListener("click", closeReferencePanel);
+        referenceBackdrop.addEventListener("click", closeReferencePanel);
+
+        // ===========================================================================
+        // Sabotage side drawer — same polling/logic as before, just relocated into
+        // a drawer reachable from both the dashboard top bar and the node view.
+        // ===========================================================================
+        const sabotageDrawer = document.getElementById("sabotageDrawer");
+        const sabotageBackdrop = document.getElementById("sabotageBackdrop");
+        const sabBanner = document.getElementById("sabBanner");
+        const sabIncoming = document.getElementById("sabIncoming");
+        const shieldBtn = document.getElementById("shieldBtn");
+        const shieldStatus = document.getElementById("shieldStatus");
+        const rivalsList = document.getElementById("rivalsList");
+        const sabFeedback = document.getElementById("sabFeedback");
+        const frozenBanner = document.getElementById("frozenBanner");
+        const sabotageDot = document.getElementById("sabotageDot");
+
+        function openSabotageDrawer() {
+            sabotageDrawer.classList.add("open");
+            sabotageBackdrop.classList.add("open");
+            lockBodyScroll();
+        }
+        function closeSabotageDrawer() {
+            sabotageDrawer.classList.remove("open");
+            sabotageBackdrop.classList.remove("open");
+            unlockBodyScroll();
+        }
+        document.getElementById("openSabotageBtn").addEventListener("click", openSabotageDrawer);
+        document.getElementById("openSabotageBtn2").addEventListener("click", openSabotageDrawer);
+        document.getElementById("closeSabotageBtn").addEventListener("click", closeSabotageDrawer);
+        sabotageBackdrop.addEventListener("click", closeSabotageDrawer);
+
+        // ===========================================================================
+        // Sidebar (mobile off-canvas) — same open/close + scroll-lock pattern as
+        // the sabotage drawer. Desktop never toggles this (the sidebar is always
+        // visible there via CSS), it's purely the <900px hamburger drawer.
+        // ===========================================================================
+        const sidebar = document.getElementById("sidebar");
+        const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+        function openSidebar() {
+            sidebar.classList.add("open");
+            sidebarBackdrop.classList.add("open");
+            lockBodyScroll();
+        }
+        function closeSidebar() {
+            sidebar.classList.remove("open");
+            sidebarBackdrop.classList.remove("open");
+            unlockBodyScroll();
+        }
+        document.getElementById("openSidebarBtn").addEventListener("click", openSidebar);
+        sidebarBackdrop.addEventListener("click", closeSidebar);
+        // Tapping a node (or any sidebar footer action) on mobile should tuck the
+        // drawer away rather than leaving it open behind the thing it opened.
+        grid.addEventListener("click", (e) => {
+            if (sidebar.classList.contains("open") && e.target.closest(".nav-node")) closeSidebar();
+        });
+        // The profile-menu button itself only opens a dropdown that lives inside
+        // the sidebar, so it must NOT tuck the mobile drawer away (that would hide
+        // the dropdown it just opened). Its two actions (edit profile / log out)
+        // still close the drawer once picked, same as every other footer action.
+        document.querySelectorAll(".sidebar-footer button:not(#profileMenuBtn)").forEach((el) => {
+            el.addEventListener("click", () => {
+                if (sidebar.classList.contains("open")) closeSidebar();
+            });
+        });
+
+        let frozenUntilTs = null;
+        let frozenTimer = null;
+        let sabFeedbackTimer = null;
+
+        function showSabFeedback(text, ok) {
+            sabFeedback.textContent = text;
+            sabFeedback.className = "sab-feedback " + (ok ? "banner-ok" : "banner-err");
+            sabFeedback.style.display = "block";
+            clearTimeout(sabFeedbackTimer);
+            sabFeedbackTimer = setTimeout(() => { sabFeedback.style.display = "none"; }, 5000);
+        }
+
+        function setActiveNode(nodeId) {
+            fetch(API_BASE + "/api/sabotage/active-node", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ teamId, nodeId }),
+            }).catch(() => { });
+        }
+
+        function startFrozenCountdown(seconds) {
+            frozenUntilTs = Date.now() + seconds * 1000;
+            submitAnswerBtn.disabled = true;
+            vaultSubmitBtn.disabled = true;
+            clearInterval(frozenTimer);
+            const tick = () => {
+                const remaining = Math.ceil((frozenUntilTs - Date.now()) / 1000);
+                if (remaining <= 0) {
+                    clearInterval(frozenTimer);
+                    frozenUntilTs = null;
+                    frozenBanner.classList.remove("show");
+                    submitAnswerBtn.disabled = false;
+                    vaultSubmitBtn.disabled = false;
+                    return;
+                }
+                frozenBanner.textContent = `FROZEN — a rival locked your team out for ${remaining}s.`;
+                frozenBanner.classList.add("show");
+            };
+            tick();
+            frozenTimer = setInterval(tick, 1000);
+        }
+
+        function renderSabotage(data) {
+            if (data.sabotageEnabled) {
+                sabBanner.className = "sab-banner on";
+                sabBanner.textContent = "Sabotage is live.";
+            } else {
+                sabBanner.className = "sab-banner";
+                sabBanner.textContent = data.sabotageDisabledReason || "Sabotage is disabled.";
+            }
+
+            sabIncoming.innerHTML = "";
+            let incomingFreeze = null;
+            let incomingStatic = false;
+            let incomingReshuffle = false;
+            let anyIncoming = false;
+            for (const eff of data.incoming || []) {
+                anyIncoming = true;
+                if (eff.move === "freeze") incomingFreeze = eff;
+                if (eff.move === "static_burst") incomingStatic = true;
+                if (eff.move === "reshuffle") incomingReshuffle = true;
+                const el = document.createElement("div");
+                el.className = "effect";
+                const label = eff.move === "freeze" ? "FREEZE" : eff.move === "static_burst" ? "STATIC BURST" : eff.move === "reshuffle" ? "RESHUFFLE" : eff.move.toUpperCase();
+                el.textContent = `${label} from ${eff.sourceTeamName} — ${eff.secondsLeft}s left`;
+                sabIncoming.appendChild(el);
+            }
+            sabotageDot.classList.toggle("show", anyIncoming);
+            setReshuffle(incomingReshuffle);
+
+            if (incomingFreeze && !frozenUntilTs) {
+                startFrozenCountdown(incomingFreeze.secondsLeft);
+            } else if (!incomingFreeze && frozenUntilTs) {
+                clearInterval(frozenTimer);
+                frozenUntilTs = null;
+                frozenBanner.classList.remove("show");
+                submitAnswerBtn.disabled = false;
+                vaultSubmitBtn.disabled = false;
+            }
+
+            setStaticBurst(incomingStatic);
+
+            const shieldActive = data.shieldUntil && new Date(data.shieldUntil) > new Date();
+            if (shieldActive) {
+                const secs = Math.ceil((new Date(data.shieldUntil) - new Date()) / 1000);
+                shieldStatus.textContent = `Active — ${secs}s left`;
+            } else if (data.shieldFreeCharges > 0) {
+                shieldStatus.textContent = "1 free charge available";
+            } else {
+                shieldStatus.textContent = `Costs ${data.moves.shield.cost} Intel`;
+            }
+            shieldBtn.disabled = !!shieldActive || !data.sabotageEnabled;
+
+            rivalsList.innerHTML = "";
+            for (const rival of data.rivals || []) {
+                const row = document.createElement("div");
+                row.className = "rival-row";
+
+                if (rival.vaultReached) {
+                    row.innerHTML = `<span class="name">${rival.teamName}</span><span class="status">Reached the vault — can't be targeted</span>`;
+                    rivalsList.appendChild(row);
+                    continue;
+                }
+
+                const peekDisabled = !data.sabotageEnabled || data.intel < data.moves.peek.cost;
+                const freezeDisabled = !data.sabotageEnabled || data.intel < data.moves.freeze.cost || rival.cooldowns.freeze > 0;
+                const staticDisabled = !data.sabotageEnabled || data.intel < data.moves.static_burst.cost || rival.cooldowns.static_burst > 0;
+                const reshuffleDisabled = !data.sabotageEnabled || data.intel < data.moves.reshuffle.cost || rival.cooldowns.reshuffle > 0;
+                row.innerHTML = `
+        <span class="name">${rival.teamName}</span>
+        <button class="move-btn" data-move="peek" ${peekDisabled ? "disabled" : ""}>Peek (${data.moves.peek.cost})</button>
+        <button class="move-btn danger" data-move="freeze" ${freezeDisabled ? "disabled" : ""}>${rival.cooldowns.freeze > 0 ? `Freeze (${rival.cooldowns.freeze}s)` : `Freeze (${data.moves.freeze.cost})`}</button>
+        <button class="move-btn danger" data-move="static_burst" ${staticDisabled ? "disabled" : ""}>${rival.cooldowns.static_burst > 0 ? `Static (${rival.cooldowns.static_burst}s)` : `Static (${data.moves.static_burst.cost})`}</button>
+        <button class="move-btn danger" data-move="reshuffle" ${reshuffleDisabled ? "disabled" : ""}>${rival.cooldowns.reshuffle > 0 ? `Reshuffle (${rival.cooldowns.reshuffle}s)` : `Reshuffle (${data.moves.reshuffle.cost})`}</button>
+      `;
+                row.querySelectorAll(".move-btn").forEach((btn) => {
+                    btn.addEventListener("click", () => runSabotageMove(btn.dataset.move, rival.teamId, rival.teamName));
+                });
+                rivalsList.appendChild(row);
+            }
+        }
+
+        async function runSabotageMove(move, targetTeamId, targetTeamName) {
+            const endpoints = {
+                peek: "/api/sabotage/peek",
+                freeze: "/api/sabotage/freeze",
+                static_burst: "/api/sabotage/static-burst",
+                reshuffle: "/api/sabotage/reshuffle",
+            };
+            const path = endpoints[move];
+            if (!path) return;
+            try {
+                const res = await fetch(API_BASE + path, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ teamId, targetTeamId }),
+                });
+                const data = await res.json();
+                if (isTeamGoneResponse(res, data)) return handleTeamGone();
+                if (!res.ok) {
+                    showSabFeedback(data.error || "Couldn't do that.", false);
+                    return;
+                }
+                if (move === "peek") {
+                    const nodeLabel = data.activeNodeId ? `Node ${data.activeNodeId}` : "nothing open right now";
+                    showSabFeedback(`${targetTeamName} is on: ${nodeLabel}.`, true);
+                } else if (data.applied === false) {
+                    showSabFeedback(data.message || `${targetTeamName} resisted that.`, false);
+                } else {
+                    const labels = { freeze: "Froze", static_burst: "Static-burst", reshuffle: "Reshuffled" };
+                    showSabFeedback(`${labels[move] || "Hit"} ${targetTeamName}.`, true);
+                }
+                loadProgress();
+                fetchSabotageState();
+            } catch (e) {
+                showSabFeedback("Couldn't reach the server — try again.", false);
+            }
+        }
+
+        shieldBtn.addEventListener("click", async () => {
+            shieldBtn.disabled = true;
+            try {
+                const res = await fetch(API_BASE + "/api/sabotage/shield", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ teamId }),
+                });
+                const data = await res.json();
+                if (isTeamGoneResponse(res, data)) return handleTeamGone();
+                if (!res.ok) {
+                    showSabFeedback(data.error || "Couldn't activate Shield.", false);
+                    return;
+                }
+                showSabFeedback(data.usedFreeCharge ? "Shield activated (free charge used)." : "Shield activated.", true);
+                loadProgress();
+                fetchSabotageState();
+            } catch (e) {
+                showSabFeedback("Couldn't reach the server — try again.", false);
+            } finally {
+                shieldBtn.disabled = false;
+            }
+        });
+
+        async function fetchSabotageState() {
+            try {
+                const res = await fetch(API_BASE + "/api/sabotage/state/" + teamId);
+                const data = await res.json();
+                if (isTeamGoneResponse(res, data)) return handleTeamGone();
+                if (!res.ok) return;
+                renderSabotage(data);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // ===========================================================================
+        // Team profile gate — shown before the dashboard on first login. Reopenable
+        // anytime afterward from the "Team Profile" top-bar button to edit.
+        // Backend contract (see routes/profile.js):
+        //   GET  /api/team/:teamId/profile  -> { profile: null | { members, leadEmail, leadPhone } }
+        //   POST /api/team/:teamId/profile  { members, leadEmail, leadPhone } -> { ok: true, profile }
+        // ===========================================================================
+        const profileGate = document.getElementById("profileGate");
+        const memberRows = document.getElementById("memberRows");
+        const addMemberBtn = document.getElementById("addMemberBtn");
+        const leadEmail = document.getElementById("leadEmail");
+        const leadPhone = document.getElementById("leadPhone");
+        const gateFeedback = document.getElementById("gateFeedback");
+        const gateSaveBtn = document.getElementById("gateSaveBtn");
+        const gateCancelBtn = document.getElementById("gateCancelBtn");
+        const gateHeading = document.getElementById("gateHeading");
+        const gateSub = document.getElementById("gateSub");
+        const MIN_MEMBERS = 2;
+        const MAX_MEMBERS = 4;
+        let hasSavedProfile = false;
+
+        function addMemberRow(name, roll) {
+            const rows = memberRows.querySelectorAll(".member-row");
+            if (rows.length >= MAX_MEMBERS) return;
+            const row = document.createElement("div");
+            row.className = "member-row";
+            row.innerHTML = `
+      <div class="field">
+        <label>Name</label>
+        <input type="text" class="member-name" autocomplete="off" value="${name ? name.replace(/"/g, "&quot;") : ""}" />
+      </div>
+      <div class="field">
+        <label>Roll number</label>
+        <input type="text" class="member-roll" autocomplete="off" value="${roll ? roll.replace(/"/g, "&quot;") : ""}" />
+      </div>
+      <button type="button" class="remove-member">&times;</button>
+    `;
+            row.querySelector(".remove-member").addEventListener("click", () => {
+                row.remove();
+                syncMemberRowControls();
+            });
+            memberRows.appendChild(row);
+            syncMemberRowControls();
+        }
+
+        function syncMemberRowControls() {
+            const rows = memberRows.querySelectorAll(".member-row");
+            rows.forEach((row) => {
+                row.querySelector(".remove-member").disabled = rows.length <= MIN_MEMBERS;
+            });
+            addMemberBtn.disabled = rows.length >= MAX_MEMBERS;
+        }
+
+        function resetMemberRows(members) {
+            memberRows.innerHTML = "";
+            const list = members && members.length ? members : [{}, {}];
+            for (const m of list) addMemberRow(m.name, m.roll);
+        }
+
+        function openProfileGate(existingProfile, { blocking }) {
+            resetMemberRows(existingProfile ? existingProfile.members : null);
+            leadEmail.value = existingProfile ? existingProfile.leadEmail || "" : "";
+            leadPhone.value = existingProfile ? existingProfile.leadPhone || "" : "";
+            gateFeedback.style.display = "none";
+            gateCancelBtn.hidden = blocking;
+            gateHeading.textContent = blocking ? "Before you start…" : "Edit team profile";
+            gateSub.textContent = blocking
+                ? "Add your team's members and your lead's contact info. You can edit this anytime from the top bar."
+                : "Update your team's members or lead contact info.";
+            profileGate.classList.add("open");
+            lockBodyScroll();
+        }
+        // The fullscreen gate comes AFTER the (possibly blocking) profile gate,
+        // never at the same time — two full-page gates stacked on top of each
+        // other would just hide one behind the other. Set only when checkProfile
+        // had to force the profile gate open; consumed once by closeProfileGate.
+        let pendingFsGateAfterProfile = false;
+
+        function closeProfileGate() {
+            profileGate.classList.remove("open");
+            unlockBodyScroll();
+            if (pendingFsGateAfterProfile) {
+                pendingFsGateAfterProfile = false;
+                maybeShowFsGate();
+            }
+        }
+
+        async function checkProfile() {
+            try {
+                const res = await fetch(API_BASE + "/api/team/" + teamId + "/profile");
+                const data = await res.json();
+                if (isTeamGoneResponse(res, data)) return handleTeamGone();
+                if (data.profile) {
+                    hasSavedProfile = true;
+                    maybeShowFsGate();
+                } else {
+                    openProfileGate(null, { blocking: true });
+                    pendingFsGateAfterProfile = true;
+                }
+            } catch (e) {
+                // If the profile check fails (e.g. routes/profile.js isn't deployed
+                // yet), don't block the whole dashboard behind it — just skip the gate.
+                console.error("Profile check failed:", e);
+                maybeShowFsGate();
+            }
+        }
+
+        async function saveProfile() {
+            const names = [...memberRows.querySelectorAll(".member-name")].map((el) => el.value.trim());
+            const rolls = [...memberRows.querySelectorAll(".member-roll")].map((el) => el.value.trim());
+            const members = names.map((name, i) => ({ name, roll: rolls[i] }));
+
+            if (members.some((m) => !m.name || !m.roll)) {
+                gateFeedback.textContent = "Fill in a name and roll number for every member.";
+                gateFeedback.className = "banner banner-err";
+                gateFeedback.style.display = "block";
+                return;
+            }
+            if (!leadEmail.value.trim() || !leadPhone.value.trim()) {
+                gateFeedback.textContent = "Lead email and phone are both required.";
+                gateFeedback.className = "banner banner-err";
+                gateFeedback.style.display = "block";
+                return;
+            }
+
+            gateSaveBtn.disabled = true;
+            try {
+                const res = await fetch(API_BASE + "/api/team/" + teamId + "/profile", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        members,
+                        leadEmail: leadEmail.value.trim(),
+                        leadPhone: leadPhone.value.trim(),
+                    }),
+                });
+                const data = await res.json();
+                if (isTeamGoneResponse(res, data)) return handleTeamGone();
+                if (!res.ok) throw new Error(data.error || "Couldn't save your profile.");
+                hasSavedProfile = true;
+                closeProfileGate();
+            } catch (e) {
+                gateFeedback.textContent = e.message || "Couldn't save your profile — try again.";
+                gateFeedback.className = "banner banner-err";
+                gateFeedback.style.display = "block";
+            } finally {
+                gateSaveBtn.disabled = false;
+            }
+        }
+
+        addMemberBtn.addEventListener("click", () => addMemberRow());
+        gateSaveBtn.addEventListener("click", saveProfile);
+        gateCancelBtn.addEventListener("click", closeProfileGate);
+        document.getElementById("editProfileBtn").addEventListener("click", async () => {
+            try {
+                const res = await fetch(API_BASE + "/api/team/" + teamId + "/profile");
+                const data = await res.json();
+                if (isTeamGoneResponse(res, data)) return handleTeamGone();
+                openProfileGate(data.profile || null, { blocking: false });
+            } catch (e) {
+                openProfileGate(null, { blocking: false });
+            }
+        });
+
+        // ===========================================================================
+        // Boot
+        // ===========================================================================
+        renderGrid();
+        checkProfile();
+        loadPuzzles();
+        loadProgress();
+        fetchSabotageState();
+        setInterval(fetchSabotageState, 4000);
+        setInterval(loadPuzzles, 4000);
+    </script>
+</body>
+
+</html>

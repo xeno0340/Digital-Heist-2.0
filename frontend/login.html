@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Digital Heist 2.0 — Team Login</title>
+    <script src="theme.js"></script>
+    <link rel="stylesheet" href="theme.css" />
+    <style>
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+        }
+
+        /* ---------- Layout: poster panel + login panel, side by side on wide
+     screens, stacked on narrow ones. Both panels scroll independently so
+     nothing gets clipped on short/awkward viewports. ---------- */
+        .layout {
+            display: flex;
+            flex: 1;
+            min-height: 100vh;
+            /* nowrap on purpose: the row/column switch is handled deterministically
+       by the max-width:760px media query below. Letting flex-wrap decide it
+       made the breakpoint depend on the panels' basis + padding math instead
+       of the width we actually chose. */
+            flex-wrap: nowrap;
+        }
+
+        .poster-panel {
+            flex: 1 1 420px;
+            min-width: 240px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+            background: var(--surface-2);
+            border-right: 1px solid var(--border);
+        }
+
+        .poster-panel img {
+            width: 100%;
+            max-width: 460px;
+            height: auto;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            display: block;
+        }
+
+        .login-panel {
+            flex: 1 1 380px;
+            min-width: 260px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+            position: relative;
+        }
+
+        .login-panel .topbar {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+        }
+
+        .card {
+            width: 100%;
+            max-width: 380px;
+            padding: 32px;
+        }
+
+        .card .eyebrow {
+            font-family: var(--font-mono);
+            font-size: .72rem;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin: 0 0 10px;
+        }
+
+        .card h1 {
+            font-family: var(--font-mono);
+            font-size: 1.5rem;
+            margin: 0 0 6px;
+            letter-spacing: .01em;
+        }
+
+        .card .sub {
+            color: var(--text-dim);
+            font-size: .88rem;
+            margin: 0 0 26px;
+            line-height: 1.5;
+        }
+
+        .field {
+            margin-bottom: 16px;
+        }
+
+        .msg {
+            margin-top: 16px;
+            display: none;
+        }
+
+        .msg.banner-err,
+        .msg.banner-ok {
+            display: block;
+        }
+
+        .card .btn-primary {
+            width: 100%;
+            margin-top: 6px;
+            padding: 13px;
+            font-size: .95rem;
+        }
+
+        .fine-print {
+            margin-top: 22px;
+            font-size: .76rem;
+            color: var(--text-faint);
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        /* ---------- Responsive tuning ---------- */
+        @media (max-width: 760px) {
+
+            /* Stacked layout: nowrap (column + wrap fights itself — with both
+       panels able to grow to fill min-height:100vh, "wrap" pushes the
+       second panel into a new *column* instead of stacking it below,
+       shoving the login card off-screen) and let each panel size to its
+       own content instead of stretching to fill the viewport height. */
+            .layout {
+                flex-direction: column;
+                flex-wrap: nowrap;
+                min-height: auto;
+            }
+
+            .poster-panel,
+            .login-panel {
+                flex: none;
+                min-width: 0;
+                min-height: 0;
+            }
+
+            /* .login-panel is a row flex container by default (for centering the
+       card); once .topbar drops out of absolute positioning below, it
+       becomes a sibling flex item and needs its own column stacking too,
+       or it lands beside the card instead of above it. */
+            .login-panel {
+                flex-direction: column;
+            }
+
+            .poster-panel {
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+                padding: 20px 20px 16px;
+            }
+
+            .poster-panel img {
+                max-width: 300px;
+            }
+
+            .login-panel {
+                padding: 24px 18px 40px;
+            }
+
+            .login-panel .topbar {
+                position: static;
+                display: flex;
+                justify-content: flex-end;
+                margin-bottom: 14px;
+            }
+
+            .card {
+                padding: 24px;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .poster-panel img {
+                max-width: 240px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="layout">
+        <div class="poster-panel">
+            <img src="images/mad-poster-full.jpg" alt="Digital Heist 2.0 — MAD Club, Engineers Day, 19th September" />
+        </div>
+
+        <div class="login-panel">
+            <div class="topbar">
+                <button class="theme-toggle" type="button" aria-label="Toggle theme">
+                    <span class="seg" data-seg="dark">Dark</span>
+                    <span class="seg" data-seg="light">Light</span>
+                </button>
+            </div>
+
+            <div class="card">
+                <p class="eyebrow">Team access</p>
+                <h1>Enter the heist</h1>
+                <p class="sub">Enter the team name and PIN you were given at check-in.</p>
+
+                <form id="form">
+                    <div class="field">
+                        <label for="teamName">Team name</label>
+                        <input id="teamName" type="text" autocomplete="off" required />
+                    </div>
+                    <div class="field">
+                        <label for="pin">PIN (4-6 digits)</label>
+                        <input id="pin" type="password" inputmode="numeric" pattern="\d{4,6}" autocomplete="off"
+                            required />
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">Log In</button>
+                    <div class="msg banner" id="msg"></div>
+                </form>
+
+                <p class="fine-print">Lost your credentials? Find your table's proctor — accounts are issued at check-in
+                    only.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = ""; // same origin — change if this page is hosted separately from the backend
+
+        const submitBtn = document.getElementById("submitBtn");
+        const form = document.getElementById("form");
+        const msgEl = document.getElementById("msg");
+
+        // Sent back here because this team no longer exists server-side
+        // (deleted from admin.html, possibly mid-session) — see map.html's
+        // handleTeamGone(). Surface why, rather than silently landing on a
+        // blank login form after what looked like a crash.
+        if (new URLSearchParams(window.location.search).get("removed") === "1") {
+            msgEl.textContent = "Your team session ended — it looks like this team was removed by an admin. Log in again if that's unexpected.";
+            msgEl.className = "msg banner banner-err";
+        }
+
+        // Already logged in? Skip straight to the map.
+        const existingTeamId = localStorage.getItem("dh_team_id");
+        if (existingTeamId) {
+            window.location.href = "map.html";
+        }
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const teamName = document.getElementById("teamName").value.trim();
+            const pin = document.getElementById("pin").value.trim();
+            msgEl.className = "msg banner";
+            submitBtn.disabled = true;
+
+            try {
+                const res = await fetch(API_BASE + "/api/team/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ teamName, pin }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Something went wrong.");
+
+                localStorage.setItem("dh_team_id", data.teamId);
+                localStorage.setItem("dh_team_name", data.teamName);
+                window.location.href = "map.html";
+            } catch (err) {
+                msgEl.textContent = err.message;
+                msgEl.className = "msg banner banner-err";
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>

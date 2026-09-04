@@ -23,6 +23,19 @@ create table if not exists teams (
   -- Null = hasn't reached the vault yet. Used to compute arrival order
   -- for the scoring bonus (see the Intel Economy doc).
   vault_reached_at timestamptz,
+  -- Fullscreen/tab-switch integrity lock (see routes/team.js's
+  -- integrity-lock endpoint and map.html's fullscreen/visibility
+  -- listeners): the frontend reports itself locked the moment a team
+  -- exits fullscreen or switches tabs mid-game, which blocks every
+  -- node/vault submission server-side until an admin manually clears it
+  -- from admin.html. This is a deterrent for the obvious "open Copilot
+  -- in this same browser" move, NOT real anti-cheat — it can't detect a
+  -- phone or a second device, and it can false-positive on an OS
+  -- notification or alt-tab for an innocent reason, which is exactly why
+  -- unlocking is a manual admin action rather than automatic.
+  integrity_locked      boolean not null default false,
+  integrity_lock_reason text,
+  integrity_locked_at   timestamptz,
   created_at   timestamptz not null default now()
 );
 
@@ -31,6 +44,9 @@ create table if not exists teams (
 -- the column already exists — they only add what's missing:
 -- alter table teams add column if not exists variant integer not null default 0;
 -- alter table teams add column if not exists vault_reached_at timestamptz;
+-- alter table teams add column if not exists integrity_locked boolean not null default false;
+-- alter table teams add column if not exists integrity_lock_reason text;
+-- alter table teams add column if not exists integrity_locked_at timestamptz;
 
 -- Which nodes each team has cleared. One row per (team, node) — the
 -- primary key doubles as the "already completed" guard so a resubmit of
@@ -156,3 +172,53 @@ alter table sabotage_cooldowns enable row level security;
 alter table sabotage_disable_log enable row level security;
 -- Same story as everywhere else in this file: RLS on, no policies, so
 -- only the service-role backend can touch any of this.
+
+-- ---------------------------------------------------------------------
+-- Reference Console — a curated, organizer-populated fact lookup, kept
+-- entirely separate from The Informant and its 8-question leverage cap.
+-- This is NOT a general web search and it does not (and technically
+-- cannot) "block AI" on a device — a website has no way to stop someone
+-- from opening ChatGPT/Gemini/a phone's browser in another tab. What it
+-- *can* do is give teams a legitimate, on-theme place to look up the
+-- small number of real-world facts a puzzle needs (e.g. "what date did
+-- the Titanic sink") without needing outside internet access at all, so
+-- that "no phones, use the console" is an enforceable house rule backed
+-- by a tool that actually has the answer. See README, Known Limitations.
+-- ---------------------------------------------------------------------
+create table if not exists reference_facts (
+  id           uuid primary key default gen_random_uuid(),
+  -- Short search keywords/phrases, lowercase, comma-separated is fine
+  -- (e.g. "titanic, titanic sinking, rms titanic"). The search endpoint
+  -- does simple substring matching against this plus the question.
+  keywords     text not null,
+  question     text not null,   -- e.g. "When did the Titanic sink?"
+  answer       text not null,   -- e.g. "15 April 1912"
+  created_at   timestamptz not null default now()
+);
+
+alter table reference_facts enable row level security;
+-- Same story: RLS on, no policies. Reads go through GET
+-- /api/reference/search (service role key), never straight to Supabase
+-- from the browser.
+
+-- ---------------------------------------------------------------------
+-- Team profile — collected once on a team's first login (map.html's
+-- profile gate), editable anytime after from the dashboard's "Team
+-- Profile" button. One row per team; a team with no row yet just hasn't
+-- filled it in. members is a JSON array of {name, roll}, 2-4 entries,
+-- validated by routes/profile.js (not by the DB — Supabase's free tier
+-- has no easy row-level JSON-shape check, and this data isn't sensitive
+-- enough to need one).
+-- ---------------------------------------------------------------------
+create table if not exists team_profiles (
+  team_id      uuid primary key references teams(id) on delete cascade,
+  members      jsonb not null default '[]'::jsonb,
+  lead_email   text not null default '',
+  lead_phone   text not null default '',
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+
+alter table team_profiles enable row level security;
+-- Same story: RLS on, no policies. Reads/writes go through
+-- GET/POST /api/team/:teamId/profile (service role key) only.
