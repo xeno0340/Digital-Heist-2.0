@@ -4,6 +4,8 @@ A hacking-heist-themed escape room built for the MAD Club's Engineers Day event.
 
 This document describes the system's architecture, setup procedure, and current implementation status. It is intended for anyone continuing development or preparing the system for the live event.
 
+**Live URL:** https://digital-hesit-20.vercel.app/ — redirects to `login.html`. Deploys automatically from pushes to `main` (see Section 4.1 for the deployment config).
+
 ## 1. Project Status
 
 ### 1.1 Completed
@@ -23,12 +25,12 @@ The following systems are implemented, have been exercised through manual and li
 - **Administrative controls.** The administrator panel is gated by a shared admin-secret login (no username/password), and supports bulk account creation, a full team roster (score, Intel, nodes cleared, vault status, elapsed time, team-profile contact info — with per-team detail rows), a live leaderboard ranked by nodes cleared then elapsed time, blocking/unblocking/deleting individual teams, starting the event clock, suspending or resuming sabotage room-wide, and adding, listing, and removing Reference Console entries. It uses the same shared design tokens (colors, components, light/dark toggle) as the player-facing pages.
 - **Integrity lock.** The team-facing map page requires fullscreen for the whole session; leaving fullscreen or switching tabs/apps locks that team out of node submission, the vault, and sabotage until an admin manually clears it from the admin panel (self-reported client-side, enforced server-side). This is a deterrent, not real anti-cheat — it can't detect a second device, and can false-positive on things like OS notifications.
 - **Reference Console content.** Populated with facts covering Node 3 (general-knowledge dates/trivia) and Node 4 (background context for its 8 landmark riddles, without revealing the landmark names themselves).
+- **Production deployment.** The system is deployed on Vercel and verified reachable at its public URL, serving both the static frontend and the Express backend from a single deployment (see Section 4.1 for the exact configuration and a gotcha worth knowing about).
 
 ### 1.2 In Progress / Not Yet Implemented
 
 - **Room-wide broadcasts and admin-triggered bonus nodes.** Not built — the admin panel covers roster/moderation/leaderboard/game-clock/content-editing, but there's no mechanism to push a message to every team's screen or spring a bonus puzzle mid-event.
 - **Visual design pass on the player pages.** The interface unification (one page, tabbed navigation, shared session) is structural; further graphic-design polish — typography, iconography, animation — hasn't been done. (Note: the admin panel itself has since been restyled onto the same design tokens as the player pages — see 1.1.)
-- **Production deployment.** The system currently runs against a local Express server (`localhost`) for development and testing. A `vercel.json` configuration is present but deployment to a publicly reachable environment has not been finalized or verified end-to-end.
 - **Load and dry-run testing.** The system has been exercised with a small number of manually created test teams. It has not yet been tested at or near the expected scale of thirty to forty concurrent teams, and no scheduled dry run has been conducted.
 - **Pre-event data hygiene.** Test team accounts created during development remain in the production database and should be removed prior to the live event.
 - **Unused audio assets.** `frontend/audio/*.wav` (the original Morse-code audio clips) are dead files left over from before Node 10's Morse puzzle was switched to a blinking-light indicator — nothing in the code references them anymore. Safe to delete whenever convenient; not blocking anything.
@@ -98,6 +100,32 @@ Each backend file above corresponds to one feature — Informant, team auth, nod
 6. Open `frontend/admin.html` in a browser (or `http://localhost:3000/admin.html` once the server is running) and supply the administrator secret. From there, bulk-create team accounts from the event's registration list — record the generated credentials, since PINs are shown once and are not retrievable afterward.
 7. Distribute credentials to teams and direct them to `login.html` (also the site's root `/`, which redirects there). From the map page, Informant and Reference Console are tabs alongside the puzzle map — teams never need a separate URL for either. `frontend/index.html` is a separate, unlinked dev tool for iterating on The Informant's persona/fact list without a real team login — it is not part of what teams see.
 
+### 4.1 Deploying to Vercel
+
+Live at https://digital-hesit-20.vercel.app/ — team login is at that URL directly (or `/login.html`); the admin panel is at `/admin.html`; the public leaderboard for projection is at `/leaderboard.html`.
+
+The repo includes a `vercel.json` at the **true repo root** — the same folder that contains `frontend/` and `informant-backend/` as siblings, not inside either of them. This location matters and is easy to get wrong: every `"src"` path inside `vercel.json` is resolved relative to whichever folder the file itself lives in. A `vercel.json` accidentally committed inside `informant-backend/` will silently fail to find `informant-backend/server.js` or the sibling `frontend/` folder, and Vercel will deploy only the static frontend assets with no working backend — no error, just a 404 on load or a site that never reaches the API. If a deploy ever regresses to serving only static files, check this first.
+
+Current config:
+```json
+{
+  "version": 2,
+  "builds": [
+    { "src": "informant-backend/server.js", "use": "@vercel/node" },
+    { "src": "frontend/**", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "informant-backend/server.js" },
+    { "src": "/", "dest": "informant-backend/server.js" },
+    { "src": "/(.*)", "dest": "/frontend/$1" }
+  ]
+}
+```
+
+`informant-backend/server.js` exports the Express app (`module.exports = app`) in addition to calling `.listen()` — Vercel's Node runtime calls the exported handler directly per-request and ignores `.listen()`, while `npm start` locally still uses `.listen()` as normal. Same file, both environments, no fork needed.
+
+Every environment variable in Section 5 must also be set in the Vercel project's Settings → Environment Variables — Vercel does not read the local `.env` file (it's git-ignored, so it never reaches Vercel at all). A deploy can succeed and the login page can load with all of these values missing; the failure only shows up once a request actually needs Supabase or OpenAI (login, node submission, the Informant), so verify with a real login attempt after any redeploy, not just by loading the homepage.
+
 ## 5. Environment Variables
 
 | Variable | Purpose |
@@ -122,6 +150,6 @@ Each backend file above corresponds to one feature — Informant, team auth, nod
 
 - The system has not been load-tested at the scale of a full event.
 - No automated test suite exists; verification to date has been manual and browser-based.
-- Deployment beyond a local development server is unverified.
+- The Vercel deployment has been verified reachable end-to-end for the login page; it has not yet been load-tested at event scale, and it's worth doing one full login-through-vault run against the live URL (not just localhost) before the event to confirm Supabase/OpenAI calls succeed there too.
 - The Reference Console cannot detect or block use of outside devices or AI tools; see Section 6 above.
 - The interface unification (Section 1.1) is structural only; no dedicated visual design pass has been done yet.
