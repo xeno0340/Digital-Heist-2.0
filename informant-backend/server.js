@@ -97,3 +97,10 @@ registerAdminRoutes(app, { supabase, ADMIN_SECRET });
 app.listen(PORT, () => {
   console.log(`Digital Heist 2.0 backend running at http://localhost:${PORT}`);
 });
+
+// Vercel's Node runtime needs the Express app itself exported as a request
+// handler — it calls this directly per-request rather than ever calling
+// .listen() on it. Harmless to keep .listen() above for local/`npm start`
+// use (Vercel's serverless sandbox just ignores it); this export is what
+// makes the SAME file work in both places without two copies of server.js.
+module.exports = app;
