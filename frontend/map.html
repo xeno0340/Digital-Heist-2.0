@@ -1533,7 +1533,7 @@
             <p class="sub" id="gateSub">Add your team's members and your lead's contact info. You can edit this anytime
                 from the top bar.</p>
 
-            <div class="section-label">Team members (2–4)</div>
+            <div class="section-label">Team members (1–4, solo is fine)</div>
             <div id="memberRows"></div>
             <div class="add-member-row">
                 <button class="btn" id="addMemberBtn" type="button">+ Add member</button>
@@ -2833,7 +2833,7 @@
         const gateCancelBtn = document.getElementById("gateCancelBtn");
         const gateHeading = document.getElementById("gateHeading");
         const gateSub = document.getElementById("gateSub");
-        const MIN_MEMBERS = 2;
+        const MIN_MEMBERS = 1;
         const MAX_MEMBERS = 4;
         let hasSavedProfile = false;
 
@@ -2871,7 +2871,7 @@
 
         function resetMemberRows(members) {
             memberRows.innerHTML = "";
-            const list = members && members.length ? members : [{}, {}];
+            const list = members && members.length ? members : [{}];
             for (const m of list) addMemberRow(m.name, m.roll);
         }
 

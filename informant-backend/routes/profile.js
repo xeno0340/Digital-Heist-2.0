@@ -7,7 +7,9 @@
 // write its own profile. There's no cross-team read here since every
 // query is scoped to the :teamId in the URL.
 
-const MIN_MEMBERS = 2;
+// Solo players are allowed as of this season — a team can be just one
+// person, up to a max of 4.
+const MIN_MEMBERS = 1;
 const MAX_MEMBERS = 4;
 
 // Shared shape check for POST — used instead of a DB constraint so a bad

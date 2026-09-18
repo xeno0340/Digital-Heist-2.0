@@ -205,7 +205,8 @@ alter table reference_facts enable row level security;
 -- Team profile — collected once on a team's first login (map.html's
 -- profile gate), editable anytime after from the dashboard's "Team
 -- Profile" button. One row per team; a team with no row yet just hasn't
--- filled it in. members is a JSON array of {name, roll}, 2-4 entries,
+-- filled it in. members is a JSON array of {name, roll}, 1-4 entries
+-- (solo teams are allowed),
 -- validated by routes/profile.js (not by the DB — Supabase's free tier
 -- has no easy row-level JSON-shape check, and this data isn't sensitive
 -- enough to need one).
