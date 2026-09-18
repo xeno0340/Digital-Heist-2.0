@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /login.html
+Allow: /$
+Disallow: /admin.html
+Disallow: /map.html
+Disallow: /api/
+
+Sitemap: https://digital-hesit-20.vercel.app/sitemap.xml
